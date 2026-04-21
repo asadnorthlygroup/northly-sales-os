@@ -188,16 +188,5 @@ from (values
 ) as t(handle, base_rate, followers, avg_impressions)
 where (select id from acc where handle = t.handle) is not null;
 
--- Seed initial users
-insert into users (id, email, full_name, role) values
-  -- These UUIDs will be replaced by actual auth.users IDs after OAuth login
-  -- Run this after first Google OAuth login to link the roles
-  ('00000000-0000-0000-0000-000000000001', 'asad@northlygroup.com', 'Asad Rahman', 'admin'),
-  ('00000000-0000-0000-0000-000000000002', 'abdul@northlygroup.com', 'Abdul-Rahman Shahzad', 'admin'),
-  ('00000000-0000-0000-0000-000000000003', 'asif@northlygroup.com', 'Asif Arafat', 'ae'),
-  ('00000000-0000-0000-0000-000000000004', 'andrew@northlygroup.com', 'Andrew Yaghmaee', 'ae'),
-  ('00000000-0000-0000-0000-000000000005', 'hamza@northlygroup.com', 'Hamza Ismail', 'ae'),
-  ('00000000-0000-0000-0000-000000000006', 'arvin@northlygroup.com', 'Arvin', 'sdr'),
-  ('00000000-0000-0000-0000-000000000007', 'preksha@northlygroup.com', 'Preksha', 'sdr'),
-  ('00000000-0000-0000-0000-000000000008', 'nick@northlygroup.com', 'Nick', 'ae')
-on conflict (email) do update set full_name = excluded.full_name, role = excluded.role;
+-- Users are seeded automatically via a database trigger on first Google OAuth login.
+-- Role assignment is handled by the auth trigger in 003_auth_trigger.sql.

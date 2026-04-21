@@ -41,3 +41,5 @@ next-env.d.ts
 # source PDFs and Excel (reference only, not in repo)
 *.pdf
 *.xlsx
+
+.vercel

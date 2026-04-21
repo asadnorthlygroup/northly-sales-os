@@ -45,7 +45,7 @@ create type platform_type as enum ('instagram', 'tiktok', 'facebook', 'youtube')
 create type pricing_status as enum ('active', 'contact_for_pricing', 'na');
 
 create table sub_networks (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   slug text not null unique,
   name text not null,
   description text,
@@ -53,7 +53,7 @@ create table sub_networks (
 );
 
 create table accounts (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   handle text not null unique,
   sub_network_id uuid not null references sub_networks(id),
   platform platform_type not null,
@@ -69,7 +69,7 @@ create table accounts (
 );
 
 create table account_metrics (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   account_id uuid not null references accounts(id) on delete cascade,
   recorded_at timestamptz not null default now(),
   followers bigint not null,
@@ -82,7 +82,7 @@ create table account_metrics (
 create index account_metrics_account_time on account_metrics (account_id, recorded_at desc);
 
 create table account_rates (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   account_id uuid not null references accounts(id) on delete cascade,
   effective_from timestamptz not null default now(),
   ba_feed numeric(10,2) not null,
@@ -129,7 +129,7 @@ create policy "admins_manage_rates" on account_rates for all using (
 -- ============================================================
 
 create table pricing_config (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   key text not null unique,
   value numeric(10,4) not null,
   label text not null,
@@ -167,7 +167,7 @@ insert into pricing_config (key, value, label, description) values
 -- ============================================================
 
 create table clients (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   company_name text not null,
   primary_contact_name text,
   primary_contact_email text,
@@ -194,7 +194,7 @@ create type markup_mode as enum ('flat', 'percentage');
 create type display_mode as enum ('itemized', 'package');
 
 create table deals (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   client_id uuid not null references clients(id),
   ae_id uuid not null references users(id),
   title text not null,
@@ -232,7 +232,7 @@ create policy "ae_manage_own_deals" on deals for all using (
 create type proposal_status as enum ('draft', 'sent', 'viewed', 'accepted', 'rejected');
 
 create table proposals (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   deal_id uuid not null references deals(id),
   version smallint not null default 1,
   status proposal_status not null default 'draft',
@@ -261,7 +261,7 @@ create policy "creator_manage_proposals" on proposals for all using (
 -- ============================================================
 
 create table strategy_hooks (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   category text not null,
   hook_text text not null,
   is_active boolean not null default true,
@@ -296,7 +296,7 @@ insert into strategy_hooks (category, hook_text, source) values
 -- ============================================================
 
 create table proposal_examples (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   source_file text not null,
   source_type text not null check (source_type in ('email_thread', 'close_crm', 'manual')),
   client_name text,
@@ -343,7 +343,7 @@ create policy "admins_manage_examples" on proposal_examples for all using (
 -- ============================================================
 
 create table audit_log (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   user_id uuid references users(id),
   action text not null,
   entity_type text not null,
