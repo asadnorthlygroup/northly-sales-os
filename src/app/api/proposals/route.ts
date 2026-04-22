@@ -32,26 +32,50 @@ export async function POST(request: NextRequest) {
   const body = await request.json();
   const { form, selectedAccountHandles, ladder, proposalText } = body;
 
-  // 1. Upsert client
-  const { data: client, error: clientErr } = await admin
+  // 1. Find or create client
+  const companyName = form.businessName || "Unnamed Client";
+  let client;
+
+  const { data: existing } = await admin
     .from("clients")
-    .upsert(
-      {
-        company_name: form.businessName || "Unnamed Client",
+    .select()
+    .ilike("company_name", companyName)
+    .limit(1)
+    .maybeSingle();
+
+  if (existing) {
+    // Update contact info if we have it
+    const { data: updated, error: updateErr } = await admin
+      .from("clients")
+      .update({
+        primary_contact_name: form.contactName || existing.primary_contact_name,
+        website: form.website || existing.website,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", existing.id)
+      .select()
+      .single();
+    if (updateErr || !updated) {
+      return NextResponse.json({ error: updateErr?.message ?? "Failed to update client" }, { status: 500 });
+    }
+    client = updated;
+  } else {
+    const { data: inserted, error: insertErr } = await admin
+      .from("clients")
+      .insert({
+        company_name: companyName,
         primary_contact_name: form.contactName || null,
         website: form.website || null,
         industry_category: form.category || null,
         created_by: user.id,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "company_name" }
-    )
-    .select()
-    .single();
-
-  if (clientErr || !client) {
-    console.error("client upsert error:", clientErr);
-    return NextResponse.json({ error: clientErr?.message ?? "Failed to save client" }, { status: 500 });
+      })
+      .select()
+      .single();
+    if (insertErr || !inserted) {
+      console.error("client insert error:", insertErr);
+      return NextResponse.json({ error: insertErr?.message ?? "Failed to save client" }, { status: 500 });
+    }
+    client = inserted;
   }
 
   // 2. Create deal

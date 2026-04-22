@@ -6,7 +6,8 @@ import { createBrowserClient } from "@supabase/ssr";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Sparkles, Plus, TrendingUp, Clock, CheckCircle, XCircle } from "lucide-react";
+import { Sparkles, TrendingUp, Clock, CheckCircle, XCircle } from "lucide-react";
+import { AppNav } from "@/components/ui/app-nav";
 import { formatCurrency } from "@/lib/pricing";
 
 type Deal = {
@@ -67,22 +68,7 @@ export default function DealsPage() {
 
   return (
     <main className="min-h-screen bg-slate-50">
-      <header className="border-b bg-white">
-        <div className="mx-auto max-w-7xl px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="h-8 w-8 rounded-lg bg-[#E8192C] flex items-center justify-center">
-              <span className="text-white font-bold text-sm">N</span>
-            </div>
-            <div>
-              <div className="font-semibold">Northly Sales OS</div>
-              <div className="text-xs text-muted-foreground">Deals Pipeline</div>
-            </div>
-          </div>
-          <Button asChild className="bg-[#E8192C] hover:bg-[#c0141f]">
-            <Link href="/proposals/new"><Plus className="h-4 w-4 mr-2" />New Proposal</Link>
-          </Button>
-        </div>
-      </header>
+      <AppNav page="Deals Pipeline" />
 
       <div className="mx-auto max-w-7xl px-6 py-8 space-y-6">
         {/* Stats */}

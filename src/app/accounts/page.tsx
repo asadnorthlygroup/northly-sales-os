@@ -4,9 +4,8 @@ import React, { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { Search, Users, TrendingUp } from "lucide-react";
-import Link from "next/link";
+import { AppNav } from "@/components/ui/app-nav";
 import {
   ACCOUNTS_SEED,
   CATEGORY_OPTIONS,
@@ -51,22 +50,7 @@ export default function AccountsPage() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* Header */}
-      <header className="border-b bg-white">
-        <div className="mx-auto max-w-7xl px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="h-7 w-7 rounded-lg bg-[#E8192C] flex items-center justify-center">
-              <span className="text-white font-bold text-xs">N</span>
-            </div>
-            <span className="font-semibold">Northly Sales OS</span>
-            <span className="text-muted-foreground">/</span>
-            <span className="font-medium">Accounts Directory</span>
-          </div>
-          <Button asChild className="bg-[#E8192C] hover:bg-[#c0141f]" size="sm">
-            <Link href="/proposals/new">New Proposal</Link>
-          </Button>
-        </div>
-      </header>
+      <AppNav page="Accounts Directory" />
 
       <div className="mx-auto max-w-7xl px-6 py-6">
         {/* Stats */}

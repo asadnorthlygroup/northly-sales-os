@@ -2,28 +2,12 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Sparkles, Users, BarChart3, FileText } from "lucide-react";
+import { AppNav } from "@/components/ui/app-nav";
 
 export default function Home() {
   return (
     <main className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b bg-card">
-        <div className="mx-auto max-w-7xl px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="h-8 w-8 rounded-lg bg-[#E8192C] flex items-center justify-center">
-              <span className="text-white font-bold text-sm">N</span>
-            </div>
-            <span className="font-semibold text-lg">Northly Sales OS</span>
-          </div>
-          <nav className="flex items-center gap-2">
-            <Button variant="ghost" asChild><Link href="/proposals/new">New Proposal</Link></Button>
-            <Button variant="ghost" asChild><Link href="/accounts">Accounts</Link></Button>
-            <Button asChild className="bg-[#E8192C] hover:bg-[#c0141f]">
-              <Link href="/proposals">Dashboard</Link>
-            </Button>
-          </nav>
-        </div>
-      </header>
+      <AppNav />
 
       {/* Hero */}
       <section className="mx-auto max-w-7xl px-6 py-20">
