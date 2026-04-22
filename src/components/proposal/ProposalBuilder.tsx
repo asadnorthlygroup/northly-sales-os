@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useMemo, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import {
   Card, CardContent, CardDescription, CardHeader, CardTitle,
 } from "@/components/ui/card";
@@ -18,7 +19,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Copy, Mail, MapPin, DollarSign, Layers, Sparkles,
-  ChevronRight, ChevronLeft, Check,
+  ChevronRight, ChevronLeft, Check, Save, Loader2,
 } from "lucide-react";
 import {
   ACCOUNTS_SEED,
@@ -102,7 +103,10 @@ const STEPS = ["Business", "Strategy", "Pages & Pricing", "Output"] as const;
 export default function ProposalBuilder() {
   const [form, setForm] = useState<ProposalForm>(DEFAULT_FORM);
   const [step, setStep] = useState(1);
+  const [saving, setSaving] = useState(false);
+  const [savedDealId, setSavedDealId] = useState<string | null>(null);
   const { toast } = useToast();
+  const router = useRouter();
 
   // Accounts relevant to selected cities + category
   const relevantAccounts = useMemo(
@@ -179,6 +183,31 @@ export default function ProposalBuilder() {
   const copyProposal = () => {
     navigator.clipboard.writeText(proposalText);
     toast({ title: "Copied to clipboard", description: "Proposal text is ready to paste." });
+  };
+
+  const saveProposal = async () => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      const res = await fetch("/api/proposals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          form,
+          selectedAccountHandles: selectedAccounts.map((a) => a.handle),
+          ladder,
+          proposalText,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Save failed");
+      setSavedDealId(data.dealId);
+      toast({ title: "Proposal saved!", description: "Added to your Deals Pipeline." });
+    } catch (err) {
+      toast({ title: "Save failed", description: String(err), variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -274,7 +303,18 @@ export default function ProposalBuilder() {
               />
             )}
             {step === 4 && (
-              <Step4Output proposalText={proposalText} onCopy={copyProposal} form={form} ladder={ladder} selectedAccounts={selectedAccounts} priceOf={priceOf} />
+              <Step4Output
+                proposalText={proposalText}
+                onCopy={copyProposal}
+                onSave={saveProposal}
+                saving={saving}
+                savedDealId={savedDealId}
+                onViewPipeline={() => router.push("/deals")}
+                form={form}
+                ladder={ladder}
+                selectedAccounts={selectedAccounts}
+                priceOf={priceOf}
+              />
             )}
 
             {/* Nav buttons */}
@@ -695,6 +735,10 @@ function Step3Pages({
 function Step4Output({
   proposalText,
   onCopy,
+  onSave,
+  saving,
+  savedDealId,
+  onViewPipeline,
   form,
   ladder,
   selectedAccounts,
@@ -702,6 +746,10 @@ function Step4Output({
 }: {
   proposalText: string;
   onCopy: () => void;
+  onSave: () => void;
+  saving: boolean;
+  savedDealId: string | null;
+  onViewPipeline: () => void;
   form: ProposalForm;
   ladder: ReturnType<typeof computeLadderPrices>;
   selectedAccounts: AccountSeed[];
@@ -726,6 +774,17 @@ function Step4Output({
                 <Copy className="h-4 w-4 mr-2" />
                 Copy to Clipboard
               </Button>
+              {savedDealId ? (
+                <Button size="sm" onClick={onViewPipeline} className="bg-green-600 hover:bg-green-700">
+                  <Check className="h-4 w-4 mr-2" />
+                  View in Pipeline
+                </Button>
+              ) : (
+                <Button size="sm" onClick={onSave} disabled={saving} className="bg-[#E8192C] hover:bg-[#c0141f]">
+                  {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                  {saving ? "Saving…" : "Save to Pipeline"}
+                </Button>
+              )}
             </div>
             <ScrollArea className="h-[600px] rounded-xl border bg-white p-6">
               <pre className="whitespace-pre-wrap text-sm leading-7 font-sans text-slate-800">{proposalText}</pre>
