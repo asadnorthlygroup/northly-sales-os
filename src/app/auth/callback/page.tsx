@@ -9,31 +9,26 @@ function CallbackHandler() {
   const searchParams = useSearchParams();
 
   useEffect(() => {
-    const code = searchParams.get("code");
     const error = searchParams.get("error");
+    const desc = searchParams.get("error_description") ?? "";
 
     if (error) {
-      const desc = searchParams.get("error_description") ?? "";
       router.replace(`/login?error=${error}&desc=${encodeURIComponent(desc)}`);
-      return;
-    }
-
-    if (!code) {
-      router.replace("/login?error=no_code");
       return;
     }
 
     const supabase = createBrowserClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      { auth: { flowType: "implicit" } }
     );
 
-    supabase.auth.exchangeCodeForSession(code).then(async ({ error }) => {
-      if (error) {
-        router.replace(`/login?error=${encodeURIComponent(error.message)}`);
+    // For implicit flow, Supabase processes the hash fragment automatically on getSession()
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!session) {
+        router.replace("/login?error=no_session");
         return;
       }
-      // Sync user profile to public.users via service role
       await fetch("/api/auth/sync", { method: "POST" });
       router.replace("/");
     });
