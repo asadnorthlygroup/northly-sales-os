@@ -1,9 +1,15 @@
 "use client";
 
 import { createBrowserClient } from "@supabase/ssr";
+import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 import { Button } from "@/components/ui/button";
 
-export default function LoginPage() {
+function LoginForm() {
+  const searchParams = useSearchParams();
+  const error = searchParams.get("error");
+  const desc = searchParams.get("desc");
+
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -40,6 +46,12 @@ export default function LoginPage() {
               <p className="text-sm text-muted-foreground mt-1">Use your Northly Google account</p>
             </div>
 
+            {error && (
+              <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-xs text-red-700 break-all">
+                <strong>{error}</strong>{desc ? `: ${desc}` : ""}
+              </div>
+            )}
+
             <Button
               onClick={signInWithGoogle}
               className="w-full gap-3 bg-white text-gray-700 border border-gray-300 hover:bg-gray-50"
@@ -61,5 +73,13 @@ export default function LoginPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
   );
 }

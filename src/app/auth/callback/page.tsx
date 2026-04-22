@@ -13,7 +13,8 @@ function CallbackHandler() {
     const error = searchParams.get("error");
 
     if (error) {
-      router.replace(`/login?error=${error}`);
+      const desc = searchParams.get("error_description") ?? "";
+      router.replace(`/login?error=${error}&desc=${encodeURIComponent(desc)}`);
       return;
     }
 
