@@ -3,12 +3,11 @@
 import { createBrowserClient } from "@supabase/ssr";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
+import Image from "next/image";
 
-const STATS = [
-  { value: "6M+", label: "Network Reach" },
-  { value: "120", label: "Social Channels" },
-  { value: "750M+", label: "Monthly Views" },
-  { value: "100M+", label: "Monthly Reach" },
+const BRANDS = [
+  "Waveroom", "Night Out", "Northly", "Penalty Room",
+  "Got Deals", "Must Be.", "Housing Watch", "Canada Blogs", "Bites.",
 ];
 
 function LoginForm() {
@@ -37,307 +36,268 @@ function LoginForm() {
     <>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
-
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-        .login-root {
+        body { background: #070707; }
+
+        .login-page {
           min-height: 100vh;
           display: flex;
+          flex-direction: column;
           font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-          background: #080808;
+          background: #070707;
           color: #fff;
+          position: relative;
         }
 
-        /* ── noise texture ── */
-        .noise::after {
+        /* grain texture */
+        .login-page::before {
           content: '';
           position: fixed;
           inset: 0;
           pointer-events: none;
           z-index: 0;
-          opacity: 0.035;
-          background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+          opacity: 0.032;
+          background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.68' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
         }
 
-        /* ── LEFT ── */
-        .left-panel {
-          display: none;
-          width: 58%;
-          flex-direction: column;
-          justify-content: space-between;
-          padding: 48px 64px 52px;
+        /* top red glow */
+        .login-page::after {
+          content: '';
+          position: fixed;
+          top: -30%;
+          left: 50%;
+          transform: translateX(-50%);
+          width: 80%;
+          height: 60%;
+          background: radial-gradient(ellipse at 50% 0%, rgba(232,25,44,0.13) 0%, transparent 65%);
+          pointer-events: none;
+          z-index: 0;
+        }
+
+        /* ── Nav ── */
+        .nav {
           position: relative;
-          overflow: hidden;
-          border-right: 1px solid rgba(255,255,255,0.055);
+          z-index: 10;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 24px 48px;
+          border-bottom: 1px solid rgba(255,255,255,0.05);
         }
-        @media (min-width: 1024px) { .left-panel { display: flex; } }
+        @media (max-width: 640px) { .nav { padding: 20px 24px; } }
 
-        .glow-1 {
-          position: absolute;
-          top: -10%; right: -8%;
-          width: 55%; height: 55%;
-          background: radial-gradient(circle at 60% 30%, rgba(232,25,44,0.2) 0%, transparent 65%);
-          pointer-events: none;
-        }
-        .glow-2 {
-          position: absolute;
-          bottom: -5%; left: -5%;
-          width: 40%; height: 40%;
-          background: radial-gradient(circle, rgba(232,25,44,0.07) 0%, transparent 65%);
-          pointer-events: none;
+        .logo-lockup {
+          display: flex;
+          align-items: center;
+          gap: 12px;
         }
 
-        /* ── RIGHT ── */
-        .right-panel {
+        /* ── Main hero ── */
+        .hero {
           flex: 1;
           display: flex;
           flex-direction: column;
           align-items: center;
           justify-content: center;
-          padding: 60px 32px;
-          background: #0b0b0b;
-          position: relative;
-        }
-
-        .form-wrap {
-          width: 100%;
-          max-width: 368px;
+          text-align: center;
+          padding: 80px 24px 60px;
           position: relative;
           z-index: 1;
         }
 
-        /* ── Google button ── */
+        .eyebrow {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 5px 14px;
+          border-radius: 20px;
+          background: rgba(232,25,44,0.08);
+          border: 1px solid rgba(232,25,44,0.2);
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 0.16em;
+          color: #E8192C;
+          text-transform: uppercase;
+          margin-bottom: 28px;
+        }
+        .eyebrow-dot {
+          width: 6px; height: 6px;
+          border-radius: 50%;
+          background: #E8192C;
+          box-shadow: 0 0 6px rgba(232,25,44,0.9);
+        }
+
+        h1.headline {
+          font-size: clamp(40px, 5.5vw, 72px);
+          font-weight: 900;
+          line-height: 1.02;
+          letter-spacing: -0.05em;
+          margin-bottom: 20px;
+          background: linear-gradient(170deg, #ffffff 30%, rgba(255,255,255,0.48) 100%);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
+          max-width: 760px;
+        }
+
+        p.sub {
+          font-size: 17px;
+          color: rgba(255,255,255,0.38);
+          line-height: 1.65;
+          max-width: 420px;
+          margin-bottom: 44px;
+          font-weight: 400;
+        }
+
+        /* ── Form card ── */
+        .form-card {
+          width: 100%;
+          max-width: 380px;
+          background: rgba(255,255,255,0.025);
+          border: 1px solid rgba(255,255,255,0.07);
+          border-radius: 16px;
+          padding: 28px;
+          margin-bottom: 20px;
+        }
+
         .google-btn {
           width: 100%;
           display: flex;
           align-items: center;
           justify-content: center;
           gap: 11px;
-          padding: 13px 20px;
+          padding: 14px 20px;
           border-radius: 10px;
-          border: 1px solid rgba(255,255,255,0.09);
-          background: rgba(255,255,255,0.04);
+          border: 1px solid rgba(255,255,255,0.1);
+          background: rgba(255,255,255,0.05);
           cursor: pointer;
-          font-size: 14.5px;
+          font-size: 15px;
           font-weight: 600;
           color: #fff;
           font-family: inherit;
           transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+          margin-bottom: 20px;
         }
         .google-btn:hover {
-          background: rgba(255,255,255,0.08);
-          border-color: rgba(255,255,255,0.16);
-          box-shadow: 0 0 0 3px rgba(232,25,44,0.08);
+          background: rgba(255,255,255,0.09);
+          border-color: rgba(255,255,255,0.18);
+          box-shadow: 0 0 0 3px rgba(232,25,44,0.1);
         }
 
-        /* ── Logo mark ── */
-        .n-mark {
-          width: 34px; height: 34px;
-          background: #E8192C;
-          border-radius: 8px;
-          display: flex; align-items: center; justify-content: center;
-          flex-shrink: 0;
+        .divider {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          margin-bottom: 16px;
+        }
+        .divider-line { flex: 1; height: 1px; background: rgba(255,255,255,0.06); }
+        .divider-text {
+          font-size: 10px;
+          font-weight: 600;
+          letter-spacing: 0.1em;
+          color: rgba(255,255,255,0.15);
         }
 
-        /* ── Stat dividers ── */
-        .stat-grid {
-          display: grid;
-          grid-template-columns: 1fr 1fr 1fr 1fr;
+        .restrict-note {
+          font-size: 12.5px;
+          color: rgba(255,255,255,0.22);
+          text-align: center;
+          line-height: 1.6;
+        }
+
+        /* ── Brand strip ── */
+        .brand-strip {
+          position: relative;
+          z-index: 1;
+          border-top: 1px solid rgba(255,255,255,0.05);
+          padding: 32px 48px 40px;
+          text-align: center;
+        }
+        @media (max-width: 640px) { .brand-strip { padding: 28px 24px 36px; } }
+
+        .brand-label {
+          font-size: 10px;
+          font-weight: 700;
+          letter-spacing: 0.2em;
+          color: rgba(255,255,255,0.18);
+          text-transform: uppercase;
+          margin-bottom: 20px;
+        }
+
+        .brand-list {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          justify-content: center;
           gap: 0;
-          border-top: 1px solid rgba(255,255,255,0.07);
-          padding-top: 28px;
         }
-        .stat-item {
-          padding-right: 24px;
+
+        .brand-name {
+          font-size: 13px;
+          font-weight: 600;
+          color: rgba(255,255,255,0.25);
+          letter-spacing: 0.03em;
+          padding: 6px 18px;
           border-right: 1px solid rgba(255,255,255,0.07);
-          margin-right: 24px;
+          white-space: nowrap;
+          transition: color 0.15s;
         }
-        .stat-item:last-child {
-          padding-right: 0;
-          border-right: none;
-          margin-right: 0;
-        }
+        .brand-name:last-child { border-right: none; }
+        .brand-name:hover { color: rgba(255,255,255,0.55); }
       `}</style>
 
-      <div className="login-root noise">
+      <div className="login-page">
 
-        {/* ════════════════════════════ LEFT PANEL ════════════════════════════ */}
-        <div className="left-panel">
-          <div className="glow-1" />
-          <div className="glow-2" />
-
-          {/* ── TOP: Logo + nav ── */}
-          <div style={{ position: "relative", zIndex: 1, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
-              <div className="n-mark">
-                <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                  <path d="M2 2.5h3.5l5 9.2V2.5H14V15.5h-3.5L5.5 6.3V15.5H2V2.5z" fill="white" />
-                </svg>
-              </div>
-              <div>
-                <div style={{ color: "#fff", fontWeight: 800, fontSize: 13, letterSpacing: "0.09em", lineHeight: 1 }}>NORTHLY</div>
-                <div style={{ color: "rgba(255,255,255,0.2)", fontWeight: 600, fontSize: 8.5, letterSpacing: "0.2em", marginTop: 3 }}>GROUP</div>
-              </div>
-            </div>
-            <div style={{
-              background: "rgba(232,25,44,0.1)",
-              border: "1px solid rgba(232,25,44,0.2)",
-              borderRadius: 20,
-              padding: "5px 14px",
-              fontSize: 10.5,
-              fontWeight: 700,
-              letterSpacing: "0.14em",
-              color: "#E8192C",
-              textTransform: "uppercase",
-            }}>
-              Internal Platform
-            </div>
+        {/* ── NAV ── */}
+        <nav className="nav">
+          <div className="logo-lockup">
+            <Image
+              src="/asset_1.png"
+              alt="Northly Group"
+              width={148}
+              height={48}
+              style={{ objectFit: "contain", objectPosition: "left", filter: "brightness(0) invert(1)", opacity: 0.88 }}
+              priority
+            />
           </div>
-
-          {/* ── CENTER: Hero headline ── */}
-          <div style={{ position: "relative", zIndex: 1 }}>
-            <p style={{
-              fontSize: 11, fontWeight: 700, letterSpacing: "0.2em",
-              textTransform: "uppercase", color: "#E8192C",
-              marginBottom: 20,
-            }}>
-              Canada&apos;s Largest Social Publisher
-            </p>
-
-            <h1 style={{
-              fontSize: "clamp(52px, 4.8vw, 76px)",
-              fontWeight: 900,
-              lineHeight: 0.96,
-              letterSpacing: "-0.05em",
-              marginBottom: 28,
-              background: "linear-gradient(165deg, #ffffff 0%, rgba(255,255,255,0.55) 100%)",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-              backgroundClip: "text",
-            }}>
-              The Sales OS<br />
-              for Northly&apos;s<br />
-              team.
-            </h1>
-
-            <p style={{
-              fontSize: 15,
-              color: "rgba(255,255,255,0.38)",
-              lineHeight: 1.7,
-              maxWidth: 380,
-              fontWeight: 400,
-            }}>
-              Build five-option proposals in minutes. Live pricing,
-              AI drafts, and Google Docs export — all in one place.
-            </p>
-          </div>
-
-          {/* ── BOTTOM: Stats ── */}
-          <div style={{ position: "relative", zIndex: 1 }}>
-            <div className="stat-grid">
-              {STATS.map((s) => (
-                <div className="stat-item" key={s.label}>
-                  <div style={{
-                    fontSize: "clamp(22px, 2vw, 30px)",
-                    fontWeight: 900,
-                    letterSpacing: "-0.03em",
-                    color: "#fff",
-                    lineHeight: 1,
-                    marginBottom: 6,
-                  }}>
-                    {s.value}
-                  </div>
-                  <div style={{
-                    fontSize: 11,
-                    color: "rgba(255,255,255,0.28)",
-                    fontWeight: 500,
-                    letterSpacing: "0.02em",
-                  }}>
-                    {s.label}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* ════════════════════════════ RIGHT PANEL ════════════════════════════ */}
-        <div className="right-panel">
-          {/* Subtle bottom glow */}
           <div style={{
-            position: "absolute", bottom: 0, left: "50%",
-            transform: "translateX(-50%)",
-            width: "100%", height: "40%",
-            background: "radial-gradient(ellipse at 50% 100%, rgba(232,25,44,0.055) 0%, transparent 70%)",
-            pointerEvents: "none",
-          }} />
+            fontSize: 11, fontWeight: 700, letterSpacing: "0.14em",
+            color: "rgba(255,255,255,0.3)", textTransform: "uppercase",
+          }}>
+            Internal Platform
+          </div>
+        </nav>
 
-          {/* Mobile-only logo */}
-          <div
-            style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 52, position: "relative", zIndex: 1 }}
-            className="mobile-logo"
-          >
-            <style>{`.mobile-logo { display: flex; } @media (min-width: 1024px) { .mobile-logo { display: none; } }`}</style>
-            <div className="n-mark">
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                <path d="M2 2.5h3.5l5 9.2V2.5H14V15.5h-3.5L5.5 6.3V15.5H2V2.5z" fill="white" />
-              </svg>
-            </div>
-            <div>
-              <div style={{ color: "#fff", fontWeight: 800, fontSize: 14, letterSpacing: "0.09em" }}>NORTHLY</div>
-              <div style={{ color: "rgba(255,255,255,0.2)", fontWeight: 600, fontSize: 9, letterSpacing: "0.2em", marginTop: 3 }}>GROUP</div>
-            </div>
+        {/* ── HERO ── */}
+        <main className="hero">
+          <div className="eyebrow">
+            <div className="eyebrow-dot" />
+            Proposal IQ
           </div>
 
-          <div className="form-wrap">
-            {/* Label */}
-            <div style={{
-              display: "inline-flex", alignItems: "center", gap: 7,
-              marginBottom: 24,
-              padding: "5px 12px",
-              borderRadius: 20,
-              background: "rgba(232,25,44,0.08)",
-              border: "1px solid rgba(232,25,44,0.18)",
-            }}>
-              <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#E8192C", boxShadow: "0 0 6px rgba(232,25,44,0.8)" }} />
-              <span style={{ color: "#E8192C", fontSize: 10.5, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase" }}>
-                Proposal IQ
-              </span>
-            </div>
+          <h1 className="headline">
+            The Sales OS for Canada&apos;s<br />
+            Largest Social Publisher.
+          </h1>
 
-            {/* Heading */}
-            <h2 style={{
-              fontSize: 30,
-              fontWeight: 800,
-              letterSpacing: "-0.04em",
-              color: "#fff",
-              lineHeight: 1.1,
-              marginBottom: 8,
-            }}>
-              Welcome back.
-            </h2>
-            <p style={{
-              fontSize: 14,
-              color: "rgba(255,255,255,0.35)",
-              lineHeight: 1.65,
-              marginBottom: 32,
-            }}>
-              Sign in to access your internal<br />sales platform.
-            </p>
+          <p className="sub">
+            Build five-option proposals in minutes. Live pricing,
+            AI drafts, and Google Docs export — all in one place.
+          </p>
 
-            {/* Error */}
+          {/* Form card */}
+          <div className="form-card">
             {error && (
               <div style={{
-                background: "rgba(232,25,44,0.08)",
-                border: "1px solid rgba(232,25,44,0.22)",
-                borderRadius: 10, padding: "12px 16px", marginBottom: 20,
+                background: "rgba(232,25,44,0.08)", border: "1px solid rgba(232,25,44,0.22)",
+                borderRadius: 10, padding: "12px 16px", marginBottom: 18,
                 fontSize: 13, color: "#f87171", lineHeight: 1.5,
               }}>
                 <strong>{error}</strong>{desc ? `: ${desc}` : ""}
               </div>
             )}
 
-            {/* Google button */}
             <button className="google-btn" onClick={signInWithGoogle}>
               <svg width="18" height="18" viewBox="0 0 24 24">
                 <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
@@ -348,39 +308,29 @@ function LoginForm() {
               Continue with Google
             </button>
 
-            {/* Divider */}
-            <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "22px 0" }}>
-              <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.06)" }} />
-              <span style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: "0.1em", color: "rgba(255,255,255,0.15)" }}>
-                RESTRICTED ACCESS
-              </span>
-              <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.06)" }} />
+            <div className="divider">
+              <div className="divider-line" />
+              <span className="divider-text">RESTRICTED ACCESS</span>
+              <div className="divider-line" />
             </div>
 
-            <p style={{ fontSize: 12.5, color: "rgba(255,255,255,0.22)", textAlign: "center", lineHeight: 1.6 }}>
+            <p className="restrict-note">
               Limited to{" "}
-              <span style={{ color: "#E8192C", fontWeight: 600 }}>@northlygroup.com</span>{" "}
-              accounts.
+              <span style={{ color: "#E8192C", fontWeight: 600 }}>@northlygroup.com</span>
+              {" "}accounts only.
             </p>
-
-            {/* Footer */}
-            <div style={{
-              marginTop: 56,
-              paddingTop: 24,
-              borderTop: "1px solid rgba(255,255,255,0.05)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-            }}>
-              <span style={{ fontSize: 11, color: "rgba(255,255,255,0.12)", letterSpacing: "0.06em" }}>
-                © 2025 Northly Group
-              </span>
-              <span style={{ fontSize: 11, color: "rgba(255,255,255,0.12)", letterSpacing: "0.06em" }}>
-                Proposal IQ v2
-              </span>
-            </div>
           </div>
-        </div>
+        </main>
+
+        {/* ── BRAND STRIP ── */}
+        <footer className="brand-strip">
+          <p className="brand-label">Our Network — 9 Brands · 120 Channels · 6M+ Audience</p>
+          <div className="brand-list">
+            {BRANDS.map((b) => (
+              <span className="brand-name" key={b}>{b}</span>
+            ))}
+          </div>
+        </footer>
 
       </div>
     </>
