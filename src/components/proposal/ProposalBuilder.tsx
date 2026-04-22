@@ -19,7 +19,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Copy, Mail, MapPin, DollarSign, Layers, Sparkles,
-  ChevronRight, ChevronLeft, Check, Save, Loader2,
+  ChevronRight, ChevronLeft, Check, Save, Loader2, FileText, ExternalLink,
 } from "lucide-react";
 import {
   ACCOUNTS_SEED,
@@ -105,6 +105,9 @@ export default function ProposalBuilder() {
   const [step, setStep] = useState(1);
   const [saving, setSaving] = useState(false);
   const [savedDealId, setSavedDealId] = useState<string | null>(null);
+  const [savedProposalId, setSavedProposalId] = useState<string | null>(null);
+  const [exportingDoc, setExportingDoc] = useState(false);
+  const [docUrl, setDocUrl] = useState<string | null>(null);
   const { toast } = useToast();
   const router = useRouter();
 
@@ -185,6 +188,38 @@ export default function ProposalBuilder() {
     toast({ title: "Copied to clipboard", description: "Proposal text is ready to paste." });
   };
 
+  const exportToGoogleDoc = async () => {
+    if (exportingDoc) return;
+    setExportingDoc(true);
+    try {
+      const res = await fetch("/api/proposals/google-doc", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          proposalId: savedProposalId,
+          title: `${form.businessName || "Proposal"} — Northly`,
+          content: proposalText,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        if (data.error === "no_drive_token") {
+          toast({ title: "Drive access needed", description: "Sign out and back in to grant Google Drive access.", variant: "destructive" });
+        } else {
+          throw new Error(data.error ?? "Export failed");
+        }
+        return;
+      }
+      setDocUrl(data.docUrl);
+      window.open(data.docUrl, "_blank");
+      toast({ title: "Google Doc created!", description: "Opening in a new tab." });
+    } catch (err) {
+      toast({ title: "Export failed", description: String(err), variant: "destructive" });
+    } finally {
+      setExportingDoc(false);
+    }
+  };
+
   const saveProposal = async () => {
     if (saving) return;
     setSaving(true);
@@ -202,6 +237,7 @@ export default function ProposalBuilder() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Save failed");
       setSavedDealId(data.dealId);
+      setSavedProposalId(data.proposalId);
       toast({ title: "Proposal saved!", description: "Added to your Deals Pipeline." });
     } catch (err) {
       toast({ title: "Save failed", description: String(err), variant: "destructive" });
@@ -310,6 +346,9 @@ export default function ProposalBuilder() {
                 saving={saving}
                 savedDealId={savedDealId}
                 onViewPipeline={() => router.push("/deals")}
+                onExportDoc={exportToGoogleDoc}
+                exportingDoc={exportingDoc}
+                docUrl={docUrl}
                 form={form}
                 ladder={ladder}
                 selectedAccounts={selectedAccounts}
@@ -739,6 +778,9 @@ function Step4Output({
   saving,
   savedDealId,
   onViewPipeline,
+  onExportDoc,
+  exportingDoc,
+  docUrl,
   form,
   ladder,
   selectedAccounts,
@@ -750,6 +792,9 @@ function Step4Output({
   saving: boolean;
   savedDealId: string | null;
   onViewPipeline: () => void;
+  onExportDoc: () => void;
+  exportingDoc: boolean;
+  docUrl: string | null;
   form: ProposalForm;
   ladder: ReturnType<typeof computeLadderPrices>;
   selectedAccounts: AccountSeed[];
@@ -769,11 +814,22 @@ function Step4Output({
           </TabsList>
 
           <TabsContent value="email">
-            <div className="flex justify-end mb-3 gap-2">
+            <div className="flex flex-wrap justify-end mb-3 gap-2">
               <Button variant="outline" onClick={onCopy} size="sm">
                 <Copy className="h-4 w-4 mr-2" />
-                Copy to Clipboard
+                Copy
               </Button>
+              {docUrl ? (
+                <Button size="sm" variant="outline" onClick={() => window.open(docUrl, "_blank")}>
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  Open Doc
+                </Button>
+              ) : (
+                <Button size="sm" variant="outline" onClick={onExportDoc} disabled={exportingDoc}>
+                  {exportingDoc ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileText className="h-4 w-4 mr-2" />}
+                  {exportingDoc ? "Exporting…" : "Export to Google Doc"}
+                </Button>
+              )}
               {savedDealId ? (
                 <Button size="sm" onClick={onViewPipeline} className="bg-green-600 hover:bg-green-700">
                   <Check className="h-4 w-4 mr-2" />

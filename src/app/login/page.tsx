@@ -21,6 +21,7 @@ function LoginForm() {
       provider: "google",
       options: {
         redirectTo: `${window.location.origin}/auth/callback`,
+        scopes: "https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/documents",
       },
     });
   }
