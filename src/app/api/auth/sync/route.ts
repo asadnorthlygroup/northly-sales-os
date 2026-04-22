@@ -51,12 +51,13 @@ export async function POST() {
     user.email?.split("@")[0] ??
     "Unknown";
 
-  const { error } = await admin.from("users").upsert(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (admin.from("users") as any).upsert(
     {
       id: user.id,
       email: user.email!,
       full_name: fullName,
-      role: role as Database["public"]["Enums"]["user_role"],
+      role,
       avatar_url: user.user_metadata?.avatar_url ?? null,
       updated_at: new Date().toISOString(),
     },
