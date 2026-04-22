@@ -3,22 +3,14 @@
 import { createBrowserClient } from "@supabase/ssr";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
+import Image from "next/image";
 
 const STATS = [
-  { value: "5.5M+", label: "Network Audience" },
-  { value: "120", label: "Social Channels" },
-  { value: "750M+", label: "Monthly Views" },
-  { value: "100M+", label: "Monthly Reach" },
+  { value: "6M", label: "Network audience" },
+  { value: "120", label: "Social channels" },
+  { value: "750M", label: "Monthly views" },
+  { value: "100M", label: "Monthly reach" },
 ];
-
-function NorthlyMark({ size = 36, dark = false }: { size?: number; dark?: boolean }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect width="40" height="40" rx="8" fill="#E8192C" />
-      <path d="M9 10h5.8l7.4 14.2V10H28v20h-5.8L14.8 15.8V30H9V10z" fill="white" />
-    </svg>
-  );
-}
 
 function LoginForm() {
   const searchParams = useSearchParams();
@@ -42,142 +34,119 @@ function LoginForm() {
   }
 
   return (
-    <main style={{
-      minHeight: "100vh",
-      display: "flex",
-      fontFamily: "'Inter', 'Helvetica Neue', Arial, sans-serif",
-    }}>
-
-      {/* ── TOP RED STRIPE ── */}
-      <div style={{
-        position: "fixed", top: 0, left: 0, right: 0,
-        height: 4, background: "#E8192C", zIndex: 100,
-      }} />
+    <main className="flex min-h-screen" style={{ fontFamily: "'Inter', 'Helvetica Neue', Arial, sans-serif" }}>
 
       {/* ══════════════════════════════════════
-          LEFT PANEL — dark brand
+          LEFT — brand panel with real banner image
+          hidden on mobile, visible lg+
       ══════════════════════════════════════ */}
-      <div
-        className="lg:flex"
-        style={{
-          display: "none",
-          width: "54%",
-          flexDirection: "column",
-          background: "#070707",
-          borderRight: "1px solid rgba(255,255,255,0.05)",
-          position: "relative",
-          overflow: "hidden",
-        }}
-      >
-        {/* Fine grid overlay */}
+      <div className="hidden lg:flex" style={{
+        width: "56%",
+        flexDirection: "column",
+        position: "relative",
+        overflow: "hidden",
+      }}>
+        {/* Banner image — fills the panel, cropped to show mountains */}
+        <Image
+          src="/asset_0.jpg"
+          alt="Northly Group"
+          fill
+          style={{ objectFit: "cover", objectPosition: "left center" }}
+          priority
+        />
+
+        {/* Dark overlay so text is always readable */}
         <div style={{
           position: "absolute", inset: 0,
-          backgroundImage:
-            "linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px)," +
-            "linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)",
-          backgroundSize: "72px 72px",
-          pointerEvents: "none",
+          background: "linear-gradient(135deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.2) 60%, rgba(0,0,0,0.5) 100%)",
         }} />
 
-        {/* Red glow — top right */}
+        {/* Bottom gradient — strong, for stats legibility */}
         <div style={{
-          position: "absolute", top: "-15%", right: "-15%",
-          width: "65%", height: "65%",
-          background: "radial-gradient(circle, rgba(232,25,44,0.18) 0%, transparent 68%)",
-          pointerEvents: "none",
+          position: "absolute", bottom: 0, left: 0, right: 0, height: "45%",
+          background: "linear-gradient(to top, rgba(0,0,0,0.92) 0%, transparent 100%)",
         }} />
 
-        {/* Content */}
+        {/* Content layer */}
         <div style={{
           position: "relative", zIndex: 1,
           display: "flex", flexDirection: "column",
-          height: "100%", padding: "52px 60px",
+          height: "100%", padding: "44px 52px",
         }}>
 
-          {/* Logo */}
-          <div style={{ display: "flex", alignItems: "center", gap: 13 }}>
-            <NorthlyMark size={36} />
-            <div>
-              <div style={{ color: "#fff", fontWeight: 800, fontSize: 14, letterSpacing: "0.1em" }}>NORTHLY</div>
-              <div style={{ color: "rgba(255,255,255,0.22)", fontWeight: 700, fontSize: 9, letterSpacing: "0.18em", marginTop: 2 }}>GROUP</div>
-            </div>
+          {/* Real Northly Group logo (white version) */}
+          <div>
+            <Image
+              src="/asset_2.png"
+              alt="Northly Group"
+              width={180}
+              height={60}
+              style={{ objectFit: "contain", objectPosition: "left" }}
+            />
           </div>
 
-          {/* Centre hero */}
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", paddingBottom: 16 }}>
+          {/* Spacer */}
+          <div style={{ flex: 1 }} />
 
+          {/* Headline — mimics the banner typography */}
+          <div style={{ marginBottom: 40 }}>
             <div style={{
               color: "#E8192C",
-              fontSize: 11, fontWeight: 700,
-              letterSpacing: "0.2em", textTransform: "uppercase",
-              marginBottom: 24,
+              fontSize: 12, fontWeight: 800,
+              letterSpacing: "0.18em", textTransform: "uppercase",
+              marginBottom: 12,
             }}>
-              Canada&apos;s Largest Social Publisher
+              Canada&apos;s Largest
             </div>
-
             <h1 style={{
-              color: "#fff", margin: "0 0 52px",
-              fontSize: "clamp(46px, 4.2vw, 68px)",
-              fontWeight: 900, lineHeight: 1.02,
-              letterSpacing: "-0.045em",
+              color: "#fff", margin: 0,
+              fontSize: "clamp(36px, 3.6vw, 54px)",
+              fontWeight: 900, lineHeight: 1.06,
+              letterSpacing: "-0.04em",
             }}>
-              Connecting<br />
-              <span style={{ color: "#E8192C" }}>Canadians</span><br />
-              to their Cities<br />
-              &amp; Culture.
+              Social Publishing<br />Network.
             </h1>
+          </div>
 
-            {/* 2×2 stats grid */}
-            <div style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: "28px 56px",
-              borderTop: "1px solid rgba(255,255,255,0.07)",
-              paddingTop: 36,
-            }}>
-              {STATS.map((s) => (
-                <div key={s.label}>
-                  <div style={{
-                    color: "#fff",
-                    fontSize: "clamp(26px, 2.4vw, 38px)",
-                    fontWeight: 900, letterSpacing: "-0.03em", lineHeight: 1,
-                    marginBottom: 7,
-                  }}>
-                    {s.value}
-                  </div>
-                  <div style={{
-                    color: "rgba(255,255,255,0.28)",
-                    fontSize: 12, fontWeight: 500, letterSpacing: "0.04em",
-                  }}>
-                    {s.label}
-                  </div>
+          {/* Stats row — exactly as in banner */}
+          <div style={{
+            display: "flex",
+            gap: 0,
+            borderTop: "1px solid rgba(255,255,255,0.15)",
+            paddingTop: 28,
+            marginBottom: 0,
+          }}>
+            {STATS.map((s, i) => (
+              <div key={s.label} style={{
+                flex: 1,
+                paddingRight: i < STATS.length - 1 ? 24 : 0,
+                marginRight: i < STATS.length - 1 ? 24 : 0,
+                borderRight: i < STATS.length - 1 ? "1px solid rgba(255,255,255,0.12)" : "none",
+              }}>
+                <div style={{
+                  color: "#fff",
+                  fontSize: "clamp(20px, 2vw, 30px)",
+                  fontWeight: 900, letterSpacing: "-0.03em", lineHeight: 1,
+                  marginBottom: 5,
+                }}>
+                  {s.value}
                 </div>
-              ))}
-            </div>
+                <div style={{
+                  color: "rgba(255,255,255,0.45)",
+                  fontSize: 11, fontWeight: 500, letterSpacing: "0.02em",
+                  lineHeight: 1.3,
+                }}>
+                  {s.label}
+                </div>
+              </div>
+            ))}
           </div>
 
-          {/* Footer — trusted by as plain text */}
-          <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 22 }}>
-            <div style={{
-              color: "rgba(255,255,255,0.14)", fontSize: 10,
-              letterSpacing: "0.16em", textTransform: "uppercase", fontWeight: 700,
-              marginBottom: 10,
-            }}>
-              Trusted By
-            </div>
-            <div style={{
-              color: "rgba(255,255,255,0.3)",
-              fontSize: 13, fontWeight: 500, lineHeight: 1.9,
-              letterSpacing: "0.01em",
-            }}>
-              SHEIN &nbsp;·&nbsp; Domino&apos;s &nbsp;·&nbsp; Cineplex &nbsp;·&nbsp; DoorDash &nbsp;·&nbsp; No Frills &nbsp;·&nbsp; Polymarket
-            </div>
-          </div>
         </div>
       </div>
 
       {/* ══════════════════════════════════════
-          RIGHT PANEL — clean white, corporate
+          RIGHT — clean white sign-in panel
       ══════════════════════════════════════ */}
       <div style={{
         flex: 1,
@@ -186,32 +155,21 @@ function LoginForm() {
         background: "#ffffff",
         padding: "60px 32px",
         position: "relative",
+        borderLeft: "1px solid #f0f0f0",
       }}>
 
-        {/* Very subtle top-left watermark visible only on white */}
-        <div style={{
-          position: "absolute", bottom: 32, left: 40,
-          color: "rgba(0,0,0,0.06)", fontSize: 80, fontWeight: 900,
-          letterSpacing: "-0.05em", lineHeight: 1,
-          userSelect: "none", pointerEvents: "none",
-        }}>
-          N
-        </div>
-
         {/* Mobile-only logo */}
-        <div
-          className="lg:hidden"
-          style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 48 }}
-        >
-          <NorthlyMark size={36} />
-          <div>
-            <div style={{ color: "#0a0a0a", fontWeight: 800, fontSize: 16, letterSpacing: "0.08em" }}>NORTHLY</div>
-            <div style={{ color: "rgba(0,0,0,0.25)", fontWeight: 700, fontSize: 10, letterSpacing: "0.14em", marginTop: 2 }}>GROUP</div>
-          </div>
+        <div className="lg:hidden" style={{ marginBottom: 48 }}>
+          <Image
+            src="/asset_1.png"
+            alt="Northly Group"
+            width={160}
+            height={54}
+            style={{ objectFit: "contain" }}
+          />
         </div>
 
-        {/* Form area */}
-        <div style={{ width: "100%", maxWidth: 376, position: "relative", zIndex: 1 }}>
+        <div style={{ width: "100%", maxWidth: 380, position: "relative" }}>
 
           {/* Product label */}
           <div style={{
@@ -223,7 +181,7 @@ function LoginForm() {
           }}>
             <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#E8192C" }} />
             <span style={{ color: "#E8192C", fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>
-              Proposal IQ
+              Proposal IQ — Internal
             </span>
           </div>
 
@@ -231,7 +189,7 @@ function LoginForm() {
           <h2 style={{
             fontSize: 34, fontWeight: 900,
             letterSpacing: "-0.04em", color: "#080808",
-            margin: "0 0 10px", lineHeight: 1.05,
+            margin: "0 0 10px", lineHeight: 1.06,
           }}>
             Sign in to your<br />workspace.
           </h2>
@@ -239,13 +197,13 @@ function LoginForm() {
             color: "rgba(0,0,0,0.38)", fontSize: 15,
             margin: "0 0 36px", lineHeight: 1.6,
           }}>
-            Internal platform for the Northly sales team.
+            Northly Sales OS — your internal tool for<br />
+            building and closing proposals.
           </p>
 
           {error && (
             <div style={{
-              background: "#fef2f2",
-              border: "1px solid #fecaca",
+              background: "#fef2f2", border: "1px solid #fecaca",
               borderRadius: 10, padding: "12px 16px", marginBottom: 20,
               fontSize: 13, color: "#dc2626", lineHeight: 1.4,
             }}>
@@ -253,7 +211,7 @@ function LoginForm() {
             </div>
           )}
 
-          {/* Google button — light, corporate */}
+          {/* Google button */}
           <button
             onClick={signInWithGoogle}
             style={{
@@ -286,7 +244,6 @@ function LoginForm() {
             Continue with Google
           </button>
 
-          {/* OR divider */}
           <div style={{ display: "flex", alignItems: "center", gap: 14, margin: "22px 0" }}>
             <div style={{ flex: 1, height: 1, background: "#f0f0f0" }} />
             <span style={{ color: "rgba(0,0,0,0.2)", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em" }}>
@@ -295,31 +252,24 @@ function LoginForm() {
             <div style={{ flex: 1, height: 1, background: "#f0f0f0" }} />
           </div>
 
-          <p style={{
-            margin: 0, fontSize: 12.5, color: "rgba(0,0,0,0.3)",
-            textAlign: "center", lineHeight: 1.6,
-          }}>
-            Sign-in is limited to{" "}
+          <p style={{ margin: 0, fontSize: 13, color: "rgba(0,0,0,0.3)", textAlign: "center", lineHeight: 1.6 }}>
+            Limited to{" "}
             <span style={{ color: "#E8192C", fontWeight: 700 }}>@northlygroup.com</span>{" "}
-            accounts.
+            accounts only.
           </p>
 
-          {/* Bottom brand mark */}
+          {/* Footer brand */}
           <div style={{
-            marginTop: 52,
-            borderTop: "1px solid #f3f4f6",
-            paddingTop: 24,
-            display: "flex", alignItems: "center", justifyContent: "center", gap: 9,
+            marginTop: 52, borderTop: "1px solid #f3f4f6", paddingTop: 24,
+            display: "flex", alignItems: "center", justifyContent: "center",
           }}>
-            <div style={{
-              width: 18, height: 18, borderRadius: 4, background: "#E8192C",
-              display: "flex", alignItems: "center", justifyContent: "center",
-            }}>
-              <span style={{ color: "#fff", fontWeight: 900, fontSize: 9 }}>N</span>
-            </div>
-            <span style={{ color: "rgba(0,0,0,0.18)", fontSize: 11, fontWeight: 700, letterSpacing: "0.12em" }}>
-              NORTHLY SALES OS
-            </span>
+            <Image
+              src="/asset_1.png"
+              alt="Northly Group"
+              width={100}
+              height={34}
+              style={{ objectFit: "contain", opacity: 0.12 }}
+            />
           </div>
         </div>
       </div>
