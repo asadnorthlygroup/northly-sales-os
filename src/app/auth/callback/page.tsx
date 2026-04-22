@@ -28,12 +28,14 @@ function CallbackHandler() {
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     );
 
-    supabase.auth.exchangeCodeForSession(code).then(({ error }) => {
+    supabase.auth.exchangeCodeForSession(code).then(async ({ error }) => {
       if (error) {
         router.replace(`/login?error=${encodeURIComponent(error.message)}`);
-      } else {
-        router.replace("/");
+        return;
       }
+      // Sync user profile to public.users via service role
+      await fetch("/api/auth/sync", { method: "POST" });
+      router.replace("/");
     });
   }, [router, searchParams]);
 
