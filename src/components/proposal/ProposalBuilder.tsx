@@ -1168,7 +1168,11 @@ function Step3Pages({
           <div className="flex flex-wrap gap-3 items-center">
             <Badge variant="secondary"><MapPin className="h-3 w-3 mr-1" />{form.cities.map((c) => CITY_GROUPS.find((g) => g.key === c)?.label).join(", ")}</Badge>
             <Badge variant="secondary"><Layers className="h-3 w-3 mr-1" />{CATEGORY_OPTIONS.find((c) => c.value === form.category)?.label}</Badge>
-            <Badge variant="secondary"><DollarSign className="h-3 w-3 mr-1" />+$175 markup · rounded</Badge>
+            <Badge variant="secondary"><DollarSign className="h-3 w-3 mr-1" />
+              {form.markupMode === "percentage"
+                ? `${form.markupPercentage}% agency markup`
+                : "+$175 flat markup"} · rounded
+            </Badge>
             {selectedAccounts.length > 0 && (
               <div className="ml-auto flex gap-4 text-sm">
                 <div><span className="text-slate-500">Pilot (Opt 2):</span> <span className="font-semibold text-green-700">{formatCurrency(total2)}</span></div>
@@ -1299,6 +1303,14 @@ function Step3Pages({
                               <div className={`text-xs ${selected ? "text-white/70" : "text-slate-400"}`}>
                                 per BA Feed Post + 2 Stories
                               </div>
+                              {form.includeOC && account.ocRate > 0 && (
+                                <div className={`text-xs mt-1 ${selected ? "text-white/60" : "text-slate-400"}`}>
+                                  OC Reel: {formatCurrency(roundProposalPrice(account.ocRate * (form.markupMode === "percentage" ? 1 + form.markupPercentage / 100 : 1)))}
+                                  {account.talkingHeadRate > 0 && (
+                                    <> · Talking Head: {formatCurrency(roundProposalPrice(account.talkingHeadRate * (form.markupMode === "percentage" ? 1 + form.markupPercentage / 100 : 1)))}</>
+                                  )}
+                                </div>
+                              )}
                             </div>
                             <button
                               className={`h-6 w-6 flex items-center justify-center rounded-md transition-colors ${selected ? "text-white/70 hover:bg-white/20" : "text-slate-400 hover:bg-slate-100"}`}
