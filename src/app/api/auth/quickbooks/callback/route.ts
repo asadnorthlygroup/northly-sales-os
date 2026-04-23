@@ -1,0 +1,65 @@
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+
+const QB_TOKEN_URL = "https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer";
+
+export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url);
+  const code = searchParams.get("code");
+  const realmId = searchParams.get("realmId");
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL!;
+
+  if (!code) {
+    return NextResponse.redirect(`${appUrl}/deals?error=qb_no_code`);
+  }
+
+  const creds = Buffer.from(
+    `${process.env.QUICKBOOKS_CLIENT_ID}:${process.env.QUICKBOOKS_CLIENT_SECRET}`
+  ).toString("base64");
+
+  const tokenRes = await fetch(QB_TOKEN_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${creds}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+      Accept: "application/json",
+    },
+    body: new URLSearchParams({
+      grant_type: "authorization_code",
+      code,
+      redirect_uri: `${appUrl}/api/auth/quickbooks/callback`,
+    }),
+  });
+
+  if (!tokenRes.ok) {
+    const detail = await tokenRes.text();
+    console.error("QB token exchange failed:", detail);
+    return NextResponse.redirect(`${appUrl}/deals?error=qb_token_failed`);
+  }
+
+  const t = await tokenRes.json();
+
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
+  const { error } = await supabase.from("quickbooks_tokens").upsert(
+    {
+      id: 1,
+      access_token: t.access_token,
+      refresh_token: t.refresh_token,
+      realm_id: realmId ?? process.env.QUICKBOOKS_REALM_ID!,
+      expires_at: new Date(Date.now() + t.expires_in * 1000).toISOString(),
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "id" }
+  );
+
+  if (error) {
+    console.error("QB token save error:", error);
+    return NextResponse.redirect(`${appUrl}/deals?error=qb_save_failed`);
+  }
+
+  return NextResponse.redirect(`${appUrl}/deals?qb=connected`);
+}
