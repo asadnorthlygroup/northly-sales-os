@@ -106,6 +106,8 @@ export default function IOGeneratorModal({
   const [paymentSchedule, setPaymentSchedule] = useState<PaymentRow[]>([{ date: "", amount: "" }, { date: "", amount: "" }]);
   const [specialConditions, setSpecialConditions] = useState("");
   const [generating, setGenerating] = useState(false);
+  const [generateProgress, setGenerateProgress] = useState(0);
+  const generateIntervalRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
   const [docUrl, setDocUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -148,7 +150,14 @@ export default function IOGeneratorModal({
       return;
     }
     setGenerating(true);
+    setGenerateProgress(0);
     setError(null);
+    generateIntervalRef.current = setInterval(() => {
+      setGenerateProgress((p) => {
+        if (p >= 85) { clearInterval(generateIntervalRef.current!); return 85; }
+        return Math.min(85, p + 3 + Math.random() * 4);
+      });
+    }, 700);
     try {
       const res = await fetch("/api/proposals/io", {
         method: "POST",
@@ -192,7 +201,9 @@ export default function IOGeneratorModal({
     } catch (err) {
       setError(String(err));
     } finally {
-      setGenerating(false);
+      clearInterval(generateIntervalRef.current!);
+      setGenerateProgress(100);
+      setTimeout(() => setGenerating(false), 300);
     }
   }
 
@@ -447,18 +458,31 @@ export default function IOGeneratorModal({
             </div>
 
             {/* Footer */}
-            <div className="border-t px-6 py-4 flex gap-3 bg-white">
-              <Button variant="outline" onClick={onClose} className="flex-1">Cancel</Button>
-              <Button
-                onClick={generate}
-                disabled={generating}
-                className="flex-1 bg-[#E8192C] hover:bg-[#c0141f] gap-2"
-              >
-                {generating
-                  ? <><Loader2 className="h-4 w-4 animate-spin" />Generating IO…</>
-                  : <><FileText className="h-4 w-4" />Generate IO</>
-                }
-              </Button>
+            <div className="border-t px-6 py-4 space-y-3 bg-white">
+              {generating && (
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-xs text-slate-500">
+                    <span>Generating IO document…</span>
+                    <span className="font-medium">{Math.round(generateProgress)}%</span>
+                  </div>
+                  <div className="h-1.5 w-full rounded-full bg-slate-200 overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-[#E8192C] transition-all duration-500"
+                      style={{ width: `${generateProgress}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+              <div className="flex gap-3">
+                <Button variant="outline" onClick={onClose} className="flex-1" disabled={generating}>Cancel</Button>
+                <Button
+                  onClick={generate}
+                  disabled={generating}
+                  className="flex-1 bg-[#E8192C] hover:bg-[#c0141f] gap-2"
+                >
+                  <FileText className="h-4 w-4" />Generate IO
+                </Button>
+              </div>
             </div>
           </>
         )}

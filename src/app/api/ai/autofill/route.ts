@@ -4,7 +4,7 @@ import { NextResponse, type NextRequest } from "next/server";
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 export async function POST(request: NextRequest) {
-  const { type, website, transcript, businessName, goals } = await request.json();
+  const { type, website, transcript, businessName, goals, category, cities, challenge } = await request.json();
 
   if (!process.env.ANTHROPIC_API_KEY) {
     return NextResponse.json({ error: "AI not configured. Add ANTHROPIC_API_KEY to environment variables." }, { status: 503 });
@@ -77,14 +77,27 @@ Return ONLY valid JSON, no other text. Never include phrases like "Based on the 
         max_tokens: 400,
         messages: [{
           role: "user",
-          content: `You are an experienced AE at Northly Group, an influencer marketing agency in Canada. Write a brief strategic recommendation (2-4 sentences) for this client's social media campaign.
+          content: `You are an experienced Account Executive at Northly Group, a Canadian social media publisher network (Instagram, TikTok, Facebook pages across Toronto, Hamilton, GTA, Ottawa, Calgary, Vancouver, etc.).
+
+Write a 2-4 sentence media rollout plan for this client. This is the AE's internal note — the execution strategy for how to sequence and structure the campaign posts.
 
 Business: ${businessName || "the client"}
+Category: ${category || ""}
 Goals: ${(goals || []).join(", ") || "awareness"}
+Markets: ${(cities || []).join(", ") || ""}
+Challenge: ${challenge || ""}
 
-The recommendation should sound like advice from an experienced AE — direct, specific, and confident. Focus on which pages/approach to start with and why. No generic fluff.
+RULES:
+- Think like a media planner, not a generic marketer
+- Reference timing and sequencing: e.g. "Teaser post 2-3 weeks before launch, hard announcement day-of, recap post in week 1"
+- If it's a Grand Opening: structure around pre-launch awareness → opening day → follow-up
+- If it's brand awareness: which pages to start with and why, what content types fit the business
+- If it's conversion/LTO: when to drop the offer post relative to the awareness post
+- Mention which type of accounts to lead with (high-follower vs local niche) based on their goals
+- Keep it short and punchy — 2-4 sentences max
+- Do NOT write generic influencer marketing advice, SEO tips, or micro-influencer strategies
 
-Return ONLY the recommendation text, no JSON, no quotes.`,
+Return ONLY the text, no quotes, no JSON.`,
         }],
       });
 

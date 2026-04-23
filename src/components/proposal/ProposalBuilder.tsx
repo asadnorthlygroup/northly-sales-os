@@ -57,6 +57,7 @@ interface ProposalForm {
   businessInfo: string;
   differentiator: string;
   challenge: string;
+  caseStudy: string;
   proposedDirection: string;
   optionsCount: number;
   recommendedOption: number;
@@ -65,6 +66,7 @@ interface ProposalForm {
   option4Discount: number;
   option5Discount: number;
   markupMode: "flat" | "percentage";
+  markupPercentage: number;
   displayMode: "itemized" | "package";
   includeBA: boolean;
   includeLTO: boolean;
@@ -91,6 +93,7 @@ const DEFAULT_FORM: ProposalForm = {
   businessInfo: "",
   differentiator: "",
   challenge: "",
+  caseStudy: "",
   proposedDirection: "",
   optionsCount: 3,
   recommendedOption: 2,
@@ -98,7 +101,8 @@ const DEFAULT_FORM: ProposalForm = {
   option3Discount: 30,
   option4Discount: 35,
   option5Discount: 40,
-  markupMode: "flat",
+  markupMode: "percentage",
+  markupPercentage: 20,
   displayMode: "package",
   includeBA: true,
   includeLTO: false,
@@ -224,6 +228,8 @@ export default function ProposalBuilder() {
   const [isRefining, setIsRefining] = useState(false);
   const [reviewIssues, setReviewIssues] = useState<string[]>([]);
   const [isReviewing, setIsReviewing] = useState(false);
+  const [reviewProgress, setReviewProgress] = useState(0);
+  const reviewIntervalRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
   const { toast } = useToast();
   const router = useRouter();
 
@@ -296,6 +302,11 @@ export default function ProposalBuilder() {
 
   const generatedText = useMemo(
     () => generateProposalText(form, selectedAccounts, relevantAccounts, ladder, strategyHook, priceOf),
+    [form, selectedAccounts, relevantAccounts, ladder, strategyHook, priceOf]
+  );
+
+  const proposalHTML = useMemo(
+    () => generateProposalHTML(form, selectedAccounts, relevantAccounts, ladder, strategyHook, priceOf),
     [form, selectedAccounts, relevantAccounts, ladder, strategyHook, priceOf]
   );
 
@@ -485,6 +496,7 @@ export default function ProposalBuilder() {
             {step === 4 && (
               <Step4Output
                 proposalText={proposalText}
+                proposalHTML={proposalHTML}
                 isRefined={refinedText !== null}
                 onCopy={copyProposal}
                 onSave={saveProposal}
@@ -503,6 +515,7 @@ export default function ProposalBuilder() {
                 onResetRefined={() => setRefinedText(null)}
                 reviewIssues={reviewIssues}
                 isReviewing={isReviewing}
+                reviewProgress={reviewProgress}
                 onGenerateIO={() => setShowIOModal(true)}
               />
             )}
@@ -522,7 +535,15 @@ export default function ProposalBuilder() {
                   setStep(next);
                   if (next === 4) {
                     setReviewIssues([]);
+                    setReviewProgress(0);
                     setIsReviewing(true);
+                    // Simulate progress up to 90%
+                    reviewIntervalRef.current = setInterval(() => {
+                      setReviewProgress((p) => {
+                        if (p >= 88) { clearInterval(reviewIntervalRef.current!); return 88; }
+                        return Math.min(88, p + 2 + Math.random() * 3);
+                      });
+                    }, 600);
                     try {
                       const text = refinedText ?? generateProposalText(form, selectedAccounts, relevantAccounts, ladder, strategyHook, priceOf);
                       const res = await fetch("/api/ai/review-proposal", {
@@ -538,7 +559,9 @@ export default function ProposalBuilder() {
                     } catch {
                       // silently skip
                     } finally {
-                      setIsReviewing(false);
+                      clearInterval(reviewIntervalRef.current!);
+                      setReviewProgress(100);
+                      setTimeout(() => setIsReviewing(false), 400);
                     }
                   }
                 }}
@@ -657,14 +680,14 @@ function Step1Business({
           <Input value={form.contactName} onChange={(e) => update("contactName", e.target.value)} placeholder="Dino" className="mt-1" />
         </div>
 
-        {/* Row 2: website + PR date */}
+        {/* Row 2: website + launch date */}
         <div>
           <Label>Website</Label>
           <Input value={form.website} onChange={(e) => update("website", e.target.value)} placeholder="https://..." className="mt-1" />
         </div>
         <div>
-          <Label>PR / Launch Date</Label>
-          <Input value={form.prDate} onChange={(e) => update("prDate", e.target.value)} placeholder="Friday May 2 at 12pm" className="mt-1" />
+          <Label>Launch Date <span className="text-xs text-slate-400 font-normal">(optional)</span></Label>
+          <Input type="date" value={form.prDate} onChange={(e) => update("prDate", e.target.value)} className="mt-1" />
         </div>
 
         {/* City selection */}
@@ -849,6 +872,20 @@ function Step1Business({
           />
         </div>
 
+        {/* Case study */}
+        <div className="md:col-span-2">
+          <Label>
+            Related case study <span className="text-xs text-slate-400 font-normal">(optional)</span>
+          </Label>
+          <div className="text-xs text-slate-400 mt-0.5 mb-1">Mention a similar client the AE can reference in the proposal — e.g. "We ran a similar campaign for Chiang Mai's grand opening and drove 10K+ shares"</div>
+          <Textarea
+            value={form.caseStudy}
+            onChange={(e) => update("caseStudy", e.target.value)}
+            placeholder="e.g. Similar to what we did for Wingstop GO — lineups on day one, sold out opening weekend…"
+            className="h-16"
+          />
+        </div>
+
         {/* Strategy preview */}
         <div className="md:col-span-2 rounded-xl border border-dashed bg-slate-50 p-4">
           <div className="text-xs font-medium text-slate-500 mb-1">Strategy hook preview</div>
@@ -885,7 +922,10 @@ function Step2Strategy({
         body: JSON.stringify({
           type: "direction",
           businessName: form.businessName,
+          category: form.category,
           goals: form.goals,
+          cities: form.cities,
+          challenge: form.challenge,
         }),
       });
       const data = await res.json();
@@ -908,8 +948,11 @@ function Step2Strategy({
         {/* Proposed direction with voice + AI */}
         <div>
           <div className="flex items-center justify-between mb-1">
-            <Label>Proposed direction / strategy note</Label>
-            <div className="flex items-center gap-1.5">
+            <div>
+              <Label>Proposed direction / strategy note</Label>
+              <p className="text-xs text-slate-400 mt-0.5">What you think is the best account execution approach — which pages, what sequence, and why</p>
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0 ml-3">
               <VoiceBtn
                 onTranscript={(text) => update("proposedDirection", text)}
                 currentValue={form.proposedDirection}
@@ -924,7 +967,7 @@ function Step2Strategy({
           <Textarea
             value={form.proposedDirection}
             onChange={(e) => update("proposedDirection", e.target.value)}
-            placeholder="We should start focused on 2 Toronto pages to get clean data, then scale to GTA…"
+            placeholder="e.g. Lead with 2 strong Toronto pages to build initial awareness, then layer in GTA pages if budget allows. Grand opening angle — start with a teaser post 2 weeks out, hard announcement day-of, recap post in week 1."
             className="h-24"
           />
         </div>
@@ -953,14 +996,36 @@ function Step2Strategy({
             </Select>
           </div>
           <div>
-            <Label>Markup mode</Label>
-            <Select value={form.markupMode} onValueChange={(v) => update("markupMode", v as "flat" | "percentage")}>
+            <Label>Agency markup</Label>
+            <Select
+              value={form.markupPercentage === 20 ? "small" : form.markupPercentage === 40 ? "large" : "custom"}
+              onValueChange={(v) => {
+                if (v === "small") update("markupPercentage", 20);
+                else if (v === "large") update("markupPercentage", 40);
+                // custom: leave markupPercentage as-is, user edits below
+                update("markupMode", "percentage");
+              }}
+            >
               <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="flat">Flat +$175/account</SelectItem>
-                <SelectItem value="percentage">20% blanket markup</SelectItem>
+                <SelectItem value="small">Small Agency (20% increase)</SelectItem>
+                <SelectItem value="large">Large Agency (40% increase)</SelectItem>
+                <SelectItem value="custom">Custom % increase</SelectItem>
               </SelectContent>
             </Select>
+            {form.markupPercentage !== 20 && form.markupPercentage !== 40 && (
+              <div className="flex items-center gap-2 mt-2">
+                <Input
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={form.markupPercentage}
+                  onChange={(e) => update("markupPercentage", parseInt(e.target.value) || 0)}
+                  className="w-24 text-center"
+                />
+                <span className="text-sm text-slate-500">% increase</span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -1314,6 +1379,7 @@ function Step3Pages({
 // ─────────────────────────────────────────────
 function Step4Output({
   proposalText,
+  proposalHTML,
   isRefined,
   onCopy,
   onSave,
@@ -1332,9 +1398,11 @@ function Step4Output({
   onResetRefined,
   reviewIssues,
   isReviewing,
+  reviewProgress,
   onGenerateIO,
 }: {
   proposalText: string;
+  proposalHTML: string;
   isRefined: boolean;
   onCopy: () => void;
   onSave: () => void;
@@ -1353,6 +1421,7 @@ function Step4Output({
   onResetRefined: () => void;
   reviewIssues: string[];
   isReviewing: boolean;
+  reviewProgress: number;
   onGenerateIO: () => void;
 }) {
   const [chatInput, setChatInput] = useState("");
@@ -1420,9 +1489,23 @@ function Step4Output({
 
             <TabsContent value="email">
               {isReviewing && (
-                <div className="mb-3 flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-500">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
-                  AI is reviewing the proposal…
+                <div className="mb-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 space-y-2">
+                  <div className="flex items-center justify-between text-sm text-slate-500">
+                    <span>AI is reviewing the proposal…</span>
+                    <span className="font-medium text-slate-700">{Math.round(reviewProgress)}%</span>
+                  </div>
+                  <div className="h-1.5 w-full rounded-full bg-slate-200 overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-[#E8192C] transition-all duration-500"
+                      style={{ width: `${reviewProgress}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+              {reviewIssues.length > 0 && !isReviewing && (
+                <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 space-y-1">
+                  <div className="font-semibold mb-1">AI found and fixed {reviewIssues.length} issue{reviewIssues.length !== 1 ? "s" : ""}:</div>
+                  {reviewIssues.map((issue, i) => <div key={i}>• {issue}</div>)}
                 </div>
               )}
               <div className="relative">
@@ -1432,8 +1515,14 @@ function Step4Output({
                     AI is updating the proposal…
                   </div>
                 )}
-                <ScrollArea className="h-[560px] rounded-xl border bg-white p-6">
-                  <pre className="whitespace-pre-wrap text-sm leading-7 font-sans text-slate-800">{proposalText}</pre>
+                <ScrollArea className="h-[560px] rounded-xl border bg-white px-6 py-5">
+                  {isRefined
+                    ? <pre className="whitespace-pre-wrap text-sm leading-7 font-sans text-slate-800">{proposalText}</pre>
+                    : <div
+                        className="text-sm leading-relaxed text-slate-800 proposal-preview"
+                        dangerouslySetInnerHTML={{ __html: proposalHTML }}
+                      />
+                  }
                 </ScrollArea>
               </div>
             </TabsContent>
@@ -1582,6 +1671,7 @@ interface ProposalData {
   prDate: string;
   contactName: string;
   recommendedOption: number;
+  caseStudy: string;
 }
 
 function buildProposalData(
@@ -1740,6 +1830,7 @@ function buildProposalData(
     assetBullets, focusBullets, strategyHook,
     notes: form.notes, prDate: form.prDate, contactName: form.contactName,
     recommendedOption: form.recommendedOption,
+    caseStudy: form.caseStudy?.trim() ?? "",
   };
 }
 
@@ -1827,6 +1918,7 @@ ${d.notes ? d.notes.trim() + "\n\n" : ""}${d.recReasons.length ? (d.assetBullets
 
 This gives you the best chance to:
 ${d.outcomeBullets.map((b) => `• ${b}`).join("\n")}
+${d.caseStudy ? `\n\nFor reference — ${d.caseStudy}` : ""}
 
 
 Next Steps
@@ -1907,6 +1999,7 @@ ${p(d.recReasons.length ? (d.assetBullets[0] ? "Since:" : "Given that:") : "")}
 ${ul(d.recReasons)}
 ${p("This gives you the best chance to:")}
 ${ul(d.outcomeBullets)}
+${d.caseStudy ? p(`For reference — ${d.caseStudy}`) : ""}
 ${hr()}
 ${h2("Next Steps")}
 ${p(d.prDate
