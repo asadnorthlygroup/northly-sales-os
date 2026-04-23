@@ -9,6 +9,9 @@ import { AppNav } from "@/components/ui/app-nav";
 import { Sparkles, FileText, Clock, Search, ChevronRight, Copy, Check } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { formatCurrency } from "@/lib/pricing";
+import type { LadderPrices } from "@/lib/pricing";
+import { ACCOUNTS_SEED, type AccountSeed } from "@/lib/accounts-seed";
+import IOGeneratorModal from "@/components/proposal/IOGeneratorModal";
 
 type Proposal = {
   id: string;
@@ -30,15 +33,57 @@ type Proposal = {
 };
 
 const DEAL_STATUS: Record<string, { label: string; color: string }> = {
-  draft:          { label: "Draft",       color: "bg-slate-100 text-slate-600" },
-  proposal_sent:  { label: "Sent",        color: "bg-blue-100 text-blue-700" },
-  negotiating:    { label: "Negotiating", color: "bg-yellow-100 text-yellow-700" },
-  won:            { label: "Won",         color: "bg-green-100 text-green-700" },
-  lost:           { label: "Lost",        color: "bg-red-100 text-red-600" },
-  stalled:        { label: "Stalled",     color: "bg-orange-100 text-orange-600" },
+  draft:         { label: "Draft",       color: "bg-slate-100 text-slate-600" },
+  proposal_sent: { label: "Sent",        color: "bg-blue-100 text-blue-700" },
+  negotiating:   { label: "Negotiating", color: "bg-yellow-100 text-yellow-700" },
+  won:           { label: "Won",         color: "bg-green-100 text-green-700" },
+  lost:          { label: "Lost",        color: "bg-red-100 text-red-600" },
+  stalled:       { label: "Stalled",     color: "bg-orange-100 text-orange-600" },
 };
 
-function ProposalDrawer({ proposal, onClose }: { proposal: Proposal; onClose: () => void }) {
+function proposalToIOProps(p: Proposal): {
+  businessName: string;
+  cities: string[];
+  selectedAccounts: AccountSeed[];
+  ladder: LadderPrices;
+  optionsCount: number;
+} {
+  const selectedAccounts = (p.selected_accounts ?? [])
+    .map((h) => ACCOUNTS_SEED.find((a) => a.handle === h))
+    .filter(Boolean) as AccountSeed[];
+
+  const ld = p.ladder_data ?? {};
+  const ladder: LadderPrices = {
+    option2StandardValue: ld.option2StandardValue ?? 0,
+    option2Price:         ld.option2Price ?? 0,
+    option3StandardValue: ld.option3StandardValue ?? 0,
+    option3Price:         ld.option3Price ?? 0,
+    option4StandardValue: ld.option4StandardValue ?? 0,
+    option4Price:         ld.option4Price ?? 0,
+    option5StandardValue: ld.option5StandardValue ?? 0,
+    option5Price:         ld.option5Price ?? 0,
+  };
+
+  const optionsCount = (p.intake_data?.optionsCount as number | undefined) ?? 4;
+
+  return {
+    businessName: p.deals?.clients?.company_name ?? "Client",
+    cities: p.deals?.cities ?? [],
+    selectedAccounts,
+    ladder,
+    optionsCount,
+  };
+}
+
+function ProposalDrawer({
+  proposal,
+  onClose,
+  onGenerateIO,
+}: {
+  proposal: Proposal;
+  onClose: () => void;
+  onGenerateIO: () => void;
+}) {
   const [copied, setCopied] = useState(false);
 
   const copy = async () => {
@@ -68,9 +113,7 @@ function ProposalDrawer({ proposal, onClose }: { proposal: Proposal; onClose: ()
                   {DEAL_STATUS[deal.status]?.label ?? deal.status}
                 </span>
               )}
-              {opt2 && (
-                <span className="text-sm font-semibold text-slate-700">{formatCurrency(opt2)}</span>
-              )}
+              {opt2 && <span className="text-sm font-semibold text-slate-700">{formatCurrency(opt2)}</span>}
               <span className="text-xs text-muted-foreground">
                 {new Date(proposal.created_at).toLocaleDateString("en-CA", { month: "short", day: "numeric", year: "numeric" })}
               </span>
@@ -105,6 +148,15 @@ function ProposalDrawer({ proposal, onClose }: { proposal: Proposal; onClose: ()
             {copied ? <Check className="h-3.5 w-3.5 text-green-600" /> : <Copy className="h-3.5 w-3.5" />}
             {copied ? "Copied!" : "Copy Text"}
           </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={onGenerateIO}
+            className="gap-1.5 border-[#E8192C] text-[#E8192C] hover:bg-red-50"
+          >
+            <FileText className="h-3.5 w-3.5" />
+            Generate IO
+          </Button>
           <Button size="sm" asChild className="bg-[#E8192C] hover:bg-[#c0141f] gap-1.5">
             <Link href="/proposals/new">
               <Sparkles className="h-3.5 w-3.5" />
@@ -137,6 +189,7 @@ export default function ProposalsPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [selected, setSelected] = useState<Proposal | null>(null);
+  const [ioProposal, setIoProposal] = useState<Proposal | null>(null);
 
   useEffect(() => {
     fetch("/api/proposals")
@@ -168,7 +221,7 @@ export default function ProposalsPage() {
       <AppNav page="Proposals" />
 
       <div className="mx-auto max-w-7xl px-6 py-8 space-y-6">
-        {/* Stats row */}
+        {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
             { label: "Total", value: stats.total, sub: "proposals saved" },
@@ -225,7 +278,7 @@ export default function ProposalsPage() {
           </Button>
         </div>
 
-        {/* Proposals table */}
+        {/* Table */}
         {loading ? (
           <Card className="rounded-2xl">
             <CardContent className="py-16 text-center text-muted-foreground">
@@ -268,24 +321,20 @@ export default function ProposalsPage() {
                     const cfg = DEAL_STATUS[p.deals?.status ?? "draft"] ?? DEAL_STATUS.draft;
                     const opt2 = p.ladder_data?.option2Price;
                     return (
-                      <tr
-                        key={p.id}
-                        className="hover:bg-slate-50 transition-colors cursor-pointer"
-                        onClick={() => setSelected(p)}
-                      >
-                        <td className="px-4 py-3">
+                      <tr key={p.id} className="hover:bg-slate-50 transition-colors">
+                        <td className="px-4 py-3 cursor-pointer" onClick={() => setSelected(p)}>
                           <div className="font-medium">{p.deals?.clients?.company_name ?? "—"}</div>
                           {p.deals?.clients?.primary_contact_name && (
                             <div className="text-xs text-muted-foreground">{p.deals.clients.primary_contact_name}</div>
                           )}
                         </td>
-                        <td className="px-4 py-3 max-w-[200px]">
+                        <td className="px-4 py-3 max-w-[200px] cursor-pointer" onClick={() => setSelected(p)}>
                           <div className="truncate text-slate-700">{p.deals?.title ?? "—"}</div>
                           {p.deals?.goal && (
                             <div className="text-xs text-muted-foreground truncate">{p.deals.goal}</div>
                           )}
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 cursor-pointer" onClick={() => setSelected(p)}>
                           <div className="flex flex-wrap gap-1">
                             {(p.deals?.cities ?? []).slice(0, 2).map((c) => (
                               <Badge key={c} variant="secondary" className="text-xs">{c}</Badge>
@@ -295,22 +344,28 @@ export default function ProposalsPage() {
                             )}
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-slate-600">
+                        <td className="px-4 py-3 text-slate-600 cursor-pointer" onClick={() => setSelected(p)}>
                           {(p.selected_accounts ?? []).length}
                         </td>
-                        <td className="px-4 py-3 font-semibold whitespace-nowrap">
+                        <td className="px-4 py-3 font-semibold whitespace-nowrap cursor-pointer" onClick={() => setSelected(p)}>
                           {opt2 ? formatCurrency(opt2) : "—"}
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 cursor-pointer" onClick={() => setSelected(p)}>
                           <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${cfg.color}`}>
                             {cfg.label}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-slate-500 whitespace-nowrap">
+                        <td className="px-4 py-3 text-slate-500 whitespace-nowrap cursor-pointer" onClick={() => setSelected(p)}>
                           {new Date(p.created_at).toLocaleDateString("en-CA", { month: "short", day: "numeric" })}
                         </td>
                         <td className="px-4 py-3">
-                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setIoProposal(p); }}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-[#E8192C] border border-[#E8192C]/30 rounded-lg hover:bg-red-50 transition-colors whitespace-nowrap"
+                          >
+                            <FileText className="h-3 w-3" />
+                            IO
+                          </button>
                         </td>
                       </tr>
                     );
@@ -322,7 +377,29 @@ export default function ProposalsPage() {
         )}
       </div>
 
-      {selected && <ProposalDrawer proposal={selected} onClose={() => setSelected(null)} />}
+      {/* Proposal drawer */}
+      {selected && (
+        <ProposalDrawer
+          proposal={selected}
+          onClose={() => setSelected(null)}
+          onGenerateIO={() => { setSelected(null); setIoProposal(selected); }}
+        />
+      )}
+
+      {/* IO Generator modal */}
+      {ioProposal && (() => {
+        const props = proposalToIOProps(ioProposal);
+        return (
+          <IOGeneratorModal
+            businessName={props.businessName}
+            cities={props.cities}
+            selectedAccounts={props.selectedAccounts}
+            ladder={props.ladder}
+            optionsCount={props.optionsCount}
+            onClose={() => setIoProposal(null)}
+          />
+        );
+      })()}
     </main>
   );
 }
