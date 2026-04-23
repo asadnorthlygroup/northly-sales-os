@@ -1374,6 +1374,43 @@ function Step4Output({
           <CardDescription>Polished proposal ready to copy and paste into Gmail.</CardDescription>
         </CardHeader>
         <CardContent>
+          {/* Action bar — always visible regardless of active tab */}
+          <div className="flex flex-wrap items-center mb-4 gap-2">
+            {isRefined && (
+              <button onClick={onResetRefined} className="text-xs text-slate-500 underline hover:text-slate-700">
+                Reset to generated
+              </button>
+            )}
+            <div className="ml-auto flex flex-wrap gap-2">
+              <Button variant="outline" onClick={onCopy} size="sm">
+                <Copy className="h-4 w-4 mr-2" />Copy
+              </Button>
+              {docUrl ? (
+                <Button size="sm" variant="outline" onClick={() => window.open(docUrl, "_blank")}>
+                  <ExternalLink className="h-4 w-4 mr-2" />Open Doc
+                </Button>
+              ) : (
+                <Button size="sm" variant="outline" onClick={onExportDoc} disabled={exportingDoc}>
+                  {exportingDoc ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileText className="h-4 w-4 mr-2" />}
+                  {exportingDoc ? "Exporting…" : "Export to Doc"}
+                </Button>
+              )}
+              <Button size="sm" variant="outline" onClick={onGenerateIO} className="border-[#E8192C] text-[#E8192C] hover:bg-red-50">
+                <FileText className="h-4 w-4 mr-2" />Generate IO
+              </Button>
+              {savedDealId ? (
+                <Button size="sm" onClick={onViewPipeline} className="bg-green-600 hover:bg-green-700">
+                  <Check className="h-4 w-4 mr-2" />View in Pipeline
+                </Button>
+              ) : (
+                <Button size="sm" onClick={onSave} disabled={saving} className="bg-[#E8192C] hover:bg-[#c0141f]">
+                  {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                  {saving ? "Saving…" : "Save to Pipeline"}
+                </Button>
+              )}
+            </div>
+          </div>
+
           <Tabs defaultValue="email" className="w-full">
             <TabsList className="mb-4">
               <TabsTrigger value="email"><Mail className="h-4 w-4 mr-2" />Proposal Email</TabsTrigger>
@@ -1381,55 +1418,12 @@ function Step4Output({
             </TabsList>
 
             <TabsContent value="email">
-              {/* AI Review Banner */}
               {isReviewing && (
                 <div className="mb-3 flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-500">
                   <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
                   AI is reviewing the proposal…
                 </div>
               )}
-              <div className="flex flex-wrap items-center mb-3 gap-2">
-                {isRefined && (
-                  <button
-                    onClick={onResetRefined}
-                    className="text-xs text-slate-500 underline hover:text-slate-700"
-                  >
-                    Reset to generated
-                  </button>
-                )}
-                <div className="ml-auto flex gap-2">
-                  <Button variant="outline" onClick={onCopy} size="sm">
-                    <Copy className="h-4 w-4 mr-2" />
-                    Copy
-                  </Button>
-                  {docUrl ? (
-                    <Button size="sm" variant="outline" onClick={() => window.open(docUrl, "_blank")}>
-                      <ExternalLink className="h-4 w-4 mr-2" />
-                      Open Doc
-                    </Button>
-                  ) : (
-                    <Button size="sm" variant="outline" onClick={onExportDoc} disabled={exportingDoc}>
-                      {exportingDoc ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileText className="h-4 w-4 mr-2" />}
-                      {exportingDoc ? "Exporting…" : "Export to Google Doc"}
-                    </Button>
-                  )}
-                  <Button size="sm" variant="outline" onClick={onGenerateIO} className="border-[#E8192C] text-[#E8192C] hover:bg-red-50">
-                    <FileText className="h-4 w-4 mr-2" />
-                    Generate IO
-                  </Button>
-                  {savedDealId ? (
-                    <Button size="sm" onClick={onViewPipeline} className="bg-green-600 hover:bg-green-700">
-                      <Check className="h-4 w-4 mr-2" />
-                      View in Pipeline
-                    </Button>
-                  ) : (
-                    <Button size="sm" onClick={onSave} disabled={saving} className="bg-[#E8192C] hover:bg-[#c0141f]">
-                      {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-                      {saving ? "Saving…" : "Save to Pipeline"}
-                    </Button>
-                  )}
-                </div>
-              </div>
               <div className="relative">
                 {isRefining && (
                   <div className="absolute inset-0 bg-white/70 rounded-xl z-10 flex items-center justify-center gap-2 text-sm text-slate-600">
