@@ -24,6 +24,7 @@ import {
   ExternalLink, Mic, MicOff, Pencil, X, Wand2, Users,
 } from "lucide-react";
 import { AppNav } from "@/components/ui/app-nav";
+import IOGeneratorModal from "@/components/proposal/IOGeneratorModal";
 import {
   CATEGORY_OPTIONS,
   GOAL_OPTIONS,
@@ -218,6 +219,7 @@ export default function ProposalBuilder() {
   const [savedProposalId, setSavedProposalId] = useState<string | null>(null);
   const [exportingDoc, setExportingDoc] = useState(false);
   const [docUrl, setDocUrl] = useState<string | null>(null);
+  const [showIOModal, setShowIOModal] = useState(false);
   const [refinedText, setRefinedText] = useState<string | null>(null);
   const [isRefining, setIsRefining] = useState(false);
   const [reviewIssues, setReviewIssues] = useState<string[]>([]);
@@ -501,6 +503,7 @@ export default function ProposalBuilder() {
                 onResetRefined={() => setRefinedText(null)}
                 reviewIssues={reviewIssues}
                 isReviewing={isReviewing}
+                onGenerateIO={() => setShowIOModal(true)}
               />
             )}
 
@@ -549,6 +552,17 @@ export default function ProposalBuilder() {
         </div>
       </div>
     </div>
+
+    {showIOModal && selectedAccounts.length > 0 && (
+      <IOGeneratorModal
+        businessName={form.businessName || "Client"}
+        cities={form.cities}
+        selectedAccounts={selectedAccounts}
+        ladder={ladder}
+        optionsCount={form.optionsCount}
+        onClose={() => setShowIOModal(false)}
+      />
+    )}
     </>
   );
 }
@@ -1317,6 +1331,7 @@ function Step4Output({
   onResetRefined,
   reviewIssues,
   isReviewing,
+  onGenerateIO,
 }: {
   proposalText: string;
   isRefined: boolean;
@@ -1337,6 +1352,7 @@ function Step4Output({
   onResetRefined: () => void;
   reviewIssues: string[];
   isReviewing: boolean;
+  onGenerateIO: () => void;
 }) {
   const [chatInput, setChatInput] = useState("");
   const [chatHistory, setChatHistory] = useState<{ role: "user" | "ai"; text: string }[]>([]);
@@ -1397,6 +1413,10 @@ function Step4Output({
                       {exportingDoc ? "Exporting…" : "Export to Google Doc"}
                     </Button>
                   )}
+                  <Button size="sm" variant="outline" onClick={onGenerateIO} className="border-[#E8192C] text-[#E8192C] hover:bg-red-50">
+                    <FileText className="h-4 w-4 mr-2" />
+                    Generate IO
+                  </Button>
                   {savedDealId ? (
                     <Button size="sm" onClick={onViewPipeline} className="bg-green-600 hover:bg-green-700">
                       <Check className="h-4 w-4 mr-2" />
