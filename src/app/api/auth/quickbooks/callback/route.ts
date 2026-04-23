@@ -4,10 +4,11 @@ import { createClient } from "@supabase/supabase-js";
 const QB_TOKEN_URL = "https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer";
 
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
+  const requestUrl = new URL(request.url);
+  const { searchParams } = requestUrl;
   const code = searchParams.get("code");
   const realmId = searchParams.get("realmId");
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL!;
+  const appUrl = requestUrl.origin;
 
   if (!code) {
     return NextResponse.redirect(`${appUrl}/deals?error=qb_no_code`);
