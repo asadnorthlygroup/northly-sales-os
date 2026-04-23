@@ -47,6 +47,7 @@ function proposalToIOProps(p: Proposal): {
   selectedAccounts: AccountSeed[];
   ladder: LadderPrices;
   optionsCount: number;
+  collaboratorHandles: string[];
 } {
   const selectedAccounts = (p.selected_accounts ?? [])
     .map((h) => ACCOUNTS_SEED.find((a) => a.handle === h))
@@ -65,6 +66,7 @@ function proposalToIOProps(p: Proposal): {
   };
 
   const optionsCount = (p.intake_data?.optionsCount as number | undefined) ?? 4;
+  const collaboratorHandles = (p.intake_data?.collaboratorHandles as string[] | undefined) ?? [];
 
   return {
     businessName: p.deals?.clients?.company_name ?? "Client",
@@ -72,6 +74,7 @@ function proposalToIOProps(p: Proposal): {
     selectedAccounts,
     ladder,
     optionsCount,
+    collaboratorHandles,
   };
 }
 
@@ -396,6 +399,7 @@ export default function ProposalsPage() {
             selectedAccounts={props.selectedAccounts}
             ladder={props.ladder}
             optionsCount={props.optionsCount}
+            collaboratorHandles={props.collaboratorHandles}
             onClose={() => setIoProposal(null)}
           />
         );

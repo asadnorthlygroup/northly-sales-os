@@ -151,8 +151,10 @@ export async function POST(request: NextRequest) {
     paymentSchedule,
     specialConditions,
     selectedAccountHandles,
+    collaboratorHandles,
     optionPrice,
     markets,
+    offerExpiry,
   } = body as {
     optionNumber: number;
     businessName: string;
@@ -173,8 +175,10 @@ export async function POST(request: NextRequest) {
     paymentSchedule: Array<{ date: string; amount: string }>;
     specialConditions: string;
     selectedAccountHandles: string[];
+    collaboratorHandles: string[];
     optionPrice: number;
     markets: string[];
+    offerExpiry: string;
   };
 
   const tax = PROVINCE_TAX[clientProvince?.toUpperCase()] ?? PROVINCE_TAX.ON;
@@ -182,18 +186,42 @@ export async function POST(request: NextRequest) {
   const taxAmount = Math.round(subtotal * tax.rate * 100) / 100;
   const total = subtotal + taxAmount;
 
+  const collabSet = new Set(collaboratorHandles ?? []);
   const accounts = selectedAccountHandles
     .map((h) => ACCOUNTS_SEED.find((a) => a.handle === h))
     .filter(Boolean);
-  const totalFollowers = accounts.reduce((s, a) => s + (a?.followers ?? 0), 0);
+  const primaryAccounts = accounts.filter((a) => a && !collabSet.has(a.handle));
+  const collabAccounts  = accounts.filter((a) => a && collabSet.has(a.handle));
+  const totalFollowers  = accounts.reduce((s, a) => s + (a?.followers ?? 0), 0);
 
   const deliverables = getDeliverables(optionNumber, accounts.length);
+  const accountLines: string[] = [];
+  if (primaryAccounts.length) {
+    accountLines.push(`Primary accounts: ${primaryAccounts.map((a) => a!.handle).join(", ")}`);
+  }
+  if (collabAccounts.length) {
+    accountLines.push(`Collaborated accounts: ${collabAccounts.map((a) => a!.handle).join(", ")}`);
+  }
   const delivText = [
     ...deliverables.map((d) => `• ${d}`),
     "",
-    `Pages: ${selectedAccountHandles.join(", ")}`,
-    `Reach: ${new Intl.NumberFormat("en-CA").format(totalFollowers)} followers across ${accounts.length} accounts`,
+    ...accountLines,
+    `Total reach: ${new Intl.NumberFormat("en-CA").format(totalFollowers)} followers across ${accounts.length} accounts`,
   ].join("\n");
+
+  // Markets sentence — if National is included alongside specific markets, drop National from the list
+  const specificMarkets = Array.isArray(markets)
+    ? markets.filter((m) => m.toLowerCase() !== "national")
+    : [];
+  const hasNational = Array.isArray(markets) && markets.some((m) => m.toLowerCase() === "national");
+  let marketsText: string;
+  if (specificMarkets.length > 0) {
+    marketsText = `This campaign will go live across ${specificMarkets.join(", ")}.`;
+  } else if (hasNational) {
+    marketsText = "This campaign will go live nationally across Canada.";
+  } else {
+    marketsText = Array.isArray(markets) ? markets.join(", ") : "";
+  }
 
   let storyText = "";
   if (storyServicesType === "complementary") {
@@ -257,7 +285,8 @@ export async function POST(request: NextRequest) {
     ["{{SERVICE_START}}", fmtDate(serviceStartDate)],
     ["{{INVOICE_NUMBER}}", "TBD — assigned upon close"],
     ["{{OPTION_LABEL}}", getOptionLabel(optionNumber)],
-    ["{{MARKETS}}", Array.isArray(markets) ? markets.join(", ") : ""],
+    ["{{MARKETS}}", marketsText],
+    ["{{OFFER_EXPIRY}}", offerExpiry ? fmtDate(offerExpiry) : "TBD"],
     ["{{DELIVERABLES_TEXT}}", delivText],
     ["{{OPTION_PRICE}}", formatCurrency(subtotal)],
     ["{{OPTION_FEE}}", formatCurrency(subtotal)],

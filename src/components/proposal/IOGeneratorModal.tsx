@@ -53,6 +53,7 @@ interface IOGeneratorModalProps {
   selectedAccounts: AccountSeed[];
   ladder: LadderPrices;
   optionsCount: number;
+  collaboratorHandles?: string[];
   onClose: () => void;
 }
 
@@ -82,6 +83,7 @@ export default function IOGeneratorModal({
   selectedAccounts,
   ladder,
   optionsCount,
+  collaboratorHandles = [],
   onClose,
 }: IOGeneratorModalProps) {
   const [optionNumber, setOptionNumber] = useState<number>(Math.min(optionsCount, 2));
@@ -94,6 +96,7 @@ export default function IOGeneratorModal({
   const [clientEmail, setClientEmail] = useState("");
   const [serviceStartDate, setServiceStartDate] = useState("");
   const [campaignEndDate, setCampaignEndDate] = useState("");
+  const [offerExpiry, setOfferExpiry] = useState("");
   const [storyServicesType, setStoryServicesType] = useState<"complementary" | "full_price" | "other">("complementary");
   const [storyServicesNote, setStoryServicesNote] = useState("");
   const [storyRate, setStoryRate] = useState("");
@@ -170,8 +173,10 @@ export default function IOGeneratorModal({
           paymentSchedule,
           specialConditions,
           selectedAccountHandles: selectedAccounts.map((a) => a.handle),
+          collaboratorHandles,
           optionPrice,
           markets: cities,
+          offerExpiry,
         }),
       });
       const data = await res.json();
@@ -305,6 +310,9 @@ export default function IOGeneratorModal({
                     <Input type="date" value={campaignEndDate} onChange={(e) => setCampaignEndDate(e.target.value)} />
                   </Field>
                 </div>
+                <Field label="Offer expiry date">
+                  <Input type="date" value={offerExpiry} onChange={(e) => setOfferExpiry(e.target.value)} />
+                </Field>
               </div>
 
               {/* Story services */}

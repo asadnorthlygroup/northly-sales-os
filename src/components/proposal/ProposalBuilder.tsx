@@ -560,6 +560,7 @@ export default function ProposalBuilder() {
         selectedAccounts={selectedAccounts}
         ladder={ladder}
         optionsCount={form.optionsCount}
+        collaboratorHandles={form.collaboratorHandles}
         onClose={() => setShowIOModal(false)}
       />
     )}
