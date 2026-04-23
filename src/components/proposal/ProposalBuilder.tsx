@@ -1676,11 +1676,14 @@ interface ProposalData {
   goals: string;
   isGrandOpening: boolean;
   opener: string;
+  businessContext: string;
   opt1CityBlocks: { city: string; accounts: { handle: string; followers: string; price: string }[] }[];
   selectedPagesList: string[];
+  totalReach: number;
   optionNames: Record<number, string>;
   optionBestFor: Record<number, string>;
   optionDeliverables: Record<number, { items: string[] }>;
+  optionHowItWorks: Record<number, string[]>;
   optionWhyItWorks: Record<number, string>;
   optionNumbers: number[];
   optionPrices: Record<number, { price: number; standard: number; disc: number }>;
@@ -1688,13 +1691,16 @@ interface ProposalData {
   recReasons: string[];
   outcomeBullets: string[];
   assetBullets: string[];
-  focusBullets: string[];
+  fromWhatYouShared: string[];
+  roleLines: string[];
+  whyThisWorksInsight: string;
   strategyHook: string;
   notes: string;
   prDate: string;
   contactName: string;
   recommendedOption: number;
   caseStudy: string;
+  proposedDirection: string;
 }
 
 function buildProposalData(
@@ -1710,13 +1716,17 @@ function buildProposalData(
   const goals = form.goals.join(" + ") || "awareness";
   const isGrandOpening = form.goals.includes("Grand Opening");
 
-  // Opener — warm connection line like Asif writes.
-  // NEVER paste businessInfo or differentiator verbatim here — those are AE notes, not client-facing copy.
-  let opener = form.contactName
+  // Warm personal opener — never paste AE notes verbatim here
+  const opener = form.contactName
     ? `It was great connecting with you, and I really appreciate you taking the time to walk me through ${client}.`
     : `I've spent some time looking at ${client} and putting together the right approach for ${cityLabels}.`;
-  if (form.proposedDirection) {
-    opener += ` ${form.proposedDirection.trim()}`;
+
+  // Business context paragraph — strategic framing sentence pulled from businessInfo
+  let businessContext = "";
+  if (form.businessInfo) {
+    const bi = form.businessInfo.trim();
+    // Don't use it verbatim — frame it as the "this isn't just X, it's Y" observation
+    businessContext = bi.endsWith(".") ? bi : `${bi}.`;
   }
 
   // Option 1 — all relevant pages grouped by city
@@ -1737,34 +1747,46 @@ function buildProposalData(
     })),
   }));
 
+  const totalReach = selectedAccounts.reduce((s, a) => s + a.followers, 0);
   const primaryAccounts = selectedAccounts.filter((a) => !form.collaboratorHandles.includes(a.handle));
   const collabAccounts = selectedAccounts.filter((a) => form.collaboratorHandles.includes(a.handle));
 
-  // selectedPagesList used in option descriptions — shows primary / collab split
   const selectedPagesList: string[] = [];
   if (selectedAccounts.length === 0) {
     selectedPagesList.push("(no pages selected — go back to Step 3)");
   } else if (collabAccounts.length === 0) {
     selectedAccounts.forEach((a) => selectedPagesList.push(a.handle));
   } else {
-    // Split into primary feed posts + collaborated across
-    if (primaryAccounts.length) selectedPagesList.push(`Primary feed posts on ${primaryAccounts.map((a) => a.handle).join(", ")}`);
-    if (collabAccounts.length) selectedPagesList.push(`Collaborated across ${collabAccounts.map((a) => a.handle).join(", ")}`);
+    if (primaryAccounts.length) selectedPagesList.push(`Primary: ${primaryAccounts.map((a) => a.handle).join(", ")}`);
+    if (collabAccounts.length) selectedPagesList.push(`Collaborated: ${collabAccounts.map((a) => a.handle).join(", ")}`);
   }
+
+  // Conversion verb based on goals
+  const conversionVerb = form.goals.includes("Bookings") ? "book"
+    : form.goals.includes("E-commerce Sales") ? "order"
+    : form.goals.includes("Sign Ups / Downloads") ? "sign up"
+    : form.goals.includes("Foot Traffic") || isGrandOpening ? "show up"
+    : "act";
 
   const optionNames: Record<number, string> = {
     2: isGrandOpening ? "Grand Opening Push" : "Awareness Pilot",
-    3: isGrandOpening ? "Grand Opening Bundle" : "Awareness Bundle",
-    4: "Awareness + Conversion Bundle",
-    5: "Full Campaign (BA + LTO + OC)",
+    3: isGrandOpening ? "Grand Opening Bundle" : "Awareness + Traffic Driver",
+    4: isGrandOpening ? "Grand Opening + Conversion Push" : "Awareness + Conversion Campaign",
+    5: "Full Launch Campaign",
   };
   const optionBestFor: Record<number, string> = {
-    2: isGrandOpening ? "Getting in front of the right local audience ahead of and during the opening" : "Building initial visibility and testing which audiences respond best",
-    3: isGrandOpening ? "Owning awareness across all key pages at launch" : "Broader and more consistent exposure across the market",
-    4: "Driving both awareness and conversions in a single campaign",
-    5: "Maximizing reach, engagement, and conversion with the full suite of content",
+    2: isGrandOpening
+      ? "Flexibility — test which audiences respond best ahead of the opening"
+      : "Testing the market and building initial visibility with your strongest pages",
+    3: isGrandOpening
+      ? `Owning awareness across ${cityLabels} and turning visibility into opening day foot traffic`
+      : "Building strong, consistent exposure across the market and driving real traffic",
+    4: isGrandOpening
+      ? "Driving awareness AND actual turnout — announcement plus a reason to show up"
+      : "Driving actual bookings and conversions, not just visibility",
+    5: "Making the strongest possible impact — full awareness, urgency, and original content",
   };
-  // Page split line for option deliverables
+
   const primaryLabel = primaryAccounts.length ? primaryAccounts.map((a) => a.handle).join(", ") : null;
   const collabLabel = collabAccounts.length ? collabAccounts.map((a) => a.handle).join(", ") : null;
   const pageSplitLines: string[] = [];
@@ -1776,23 +1798,47 @@ function buildProposalData(
   }
 
   const optionDeliverables: Record<number, { items: string[] }> = {
-    2: { items: ["1 Dedicated Feed Post per page", "2 Story Posts per page", ...pageSplitLines] },
-    3: { items: ["1 Dedicated Feed Post per page", "2 Story Posts per page", "Coordinated rollout across the network", ...pageSplitLines] },
+    2: { items: ["1 Brand Awareness Feed Post per page", "2 Supporting Story Posts per page", ...pageSplitLines] },
+    3: { items: ["1 Brand Awareness Feed Post per page", "1 Follow-up / Traffic Driver Post per page", "4 Story Posts per page", ...pageSplitLines] },
     4: { items: ["1 Brand Awareness Post per page", "1 Limited-Time Offer / Conversion Post per page", "4 Story Posts per page", ...pageSplitLines] },
-    5: { items: ["1 Brand Awareness Post per page", "1 LTO / Conversion Post per page", "1 Original Content Shoot", "Story Rollout across all pages", ...pageSplitLines] },
-  };
-  const optionWhyItWorks: Record<number, string> = {
-    2: isGrandOpening
-      ? `This gets ${client} in front of the core ${cityLabels} audience ahead of the opening. Focused, targeted, and timed to drive foot traffic right from day one.`
-      : `Focused coverage on the strongest pages gives you clean performance data from the first campaign and a clear foundation to scale from.`,
-    3: isGrandOpening
-      ? `Multiple pages, simultaneous rollout. This creates the "everyone is talking about it" effect that drives lineups and traffic on opening day.`
-      : `Multiple posts across different pages create repeated touchpoints — helping people remember the brand when they're ready to act.`,
-    4: `The first post builds awareness and credibility. The follow-up gives people a specific reason to act — whether that's booking, visiting, or ordering.`,
-    5: `This is the most complete approach. We introduce the brand, drive urgency, and produce original content that lives on your page long after the campaign ends.`,
+    5: { items: ["1 Brand Awareness Post per page", "1 LTO / Conversion Post per page", "1 Original Content shoot", "Story rollout across all pages", ...pageSplitLines] },
   };
 
-  // Hedge phrases that indicate AI couldn't find real content — filter these out entirely
+  // "How this works" — Post 1 / Post 2 sequence, like AE examples
+  const optionHowItWorks: Record<number, string[]> = {
+    2: [
+      `Post 1 – Brand Awareness: Introduce ${client} to the ${cityLabels} audience. Build familiarity with the brand, what you offer, and what makes you different.`,
+      "Supporting Story Posts reinforce reach and keep the brand top of mind.",
+    ],
+    3: [
+      `Post 1 – Brand Awareness: Introduce ${client} and build familiarity across the ${cityLabels} network.`,
+      isGrandOpening
+        ? `Post 2 – Opening Push: A second coordinated post creates the "everyone is talking about it" effect — exactly what drives lineups and foot traffic on opening day.`
+        : `Post 2 – Traffic Driver: Multiple posts across different pages create repeated touchpoints — helping people remember the brand when they're ready to ${conversionVerb}.`,
+    ],
+    4: [
+      `Post 1 – Brand Awareness: Introduce ${client} and build credibility with the ${cityLabels} audience.`,
+      `Post 2 – Limited-Time Offer: Give people a specific reason to ${conversionVerb} now. This is what turns "I've seen this before" → "I should ${conversionVerb} now."`,
+    ],
+    5: [
+      `Post 1 – Brand Awareness: Introduce the brand and build familiarity.`,
+      `Post 2 – Limited-Time Offer: Drive urgency and give people a clear reason to ${conversionVerb}.`,
+      `Post 3 – Original Content: Showcase the actual experience through video. For a brand like ${client}, this is the strongest driver of emotional connection and purchase intent — and it lives on your page long after the campaign ends.`,
+    ],
+  };
+
+  const optionWhyItWorks: Record<number, string> = {
+    2: isGrandOpening
+      ? `Focused, targeted, and timed to drive awareness and foot traffic right from day one.`
+      : `Focused coverage on your strongest pages gives you clean performance data from the first campaign — and a clear foundation to build on.`,
+    3: isGrandOpening
+      ? `Multiple pages, simultaneous rollout. This is what creates the "everyone is talking about it" effect that drives lineups on opening day.`
+      : `Multiple posts across different pages create repeated touchpoints — helping people remember ${client} when they're ready to act.`,
+    4: `The awareness post builds recognition. The follow-up gives people a specific reason to ${conversionVerb}. This structure is designed to move people from seeing → acting.`,
+    5: `This is the most complete approach. We introduce the brand, drive urgency with an offer, and produce original content that extends the campaign's impact well beyond the posting window.`,
+  };
+
+  // Hedge phrase filter
   const HEDGE_PATTERNS = [
     /^based on/i, /^it appears/i, /^however/i, /^not clearly/i,
     /^specific differentiator/i, /^limited (website|content)/i,
@@ -1801,7 +1847,7 @@ function buildProposalData(
   ];
   const isHedge = (s: string) => HEDGE_PATTERNS.some((p) => p.test(s.trim()));
 
-  // "Already has" bullets — SHORT and punchy, max 100 chars each, filter AI hedge language
+  // "You've got:" bullets — short punchy differentiators
   const assetBullets: string[] = [];
   if (form.differentiator) {
     form.differentiator.split(/[,;]/).map((s) => s.trim()).filter(Boolean)
@@ -1811,10 +1857,44 @@ function buildProposalData(
   }
   if (assetBullets.length === 0) assetBullets.push(`A strong concept with real potential in ${cityLabels}`);
 
-  const focusBullets: string[] = [];
-  if (form.challenge) focusBullets.push(form.challenge.trim().replace(/\.$/, ""));
-  focusBullets.push(`${isGrandOpening ? "Maximizing awareness and foot traffic in the opening window" : `Driving ${goals.toLowerCase()} beyond the existing audience`}`);
-  if (isGrandOpening) focusBullets.push("Creating urgency that converts attention into attendance");
+  // "From what you shared:" — diagnosis section (2-3 insights based on challenge + category)
+  const fromWhatYouShared: string[] = [];
+  if (form.challenge) fromWhatYouShared.push(form.challenge.trim().replace(/\.$/, ""));
+  const categoryInsight: Partial<Record<BusinessCategory, string>> = {
+    restaurant: "The product is what will sell itself — the main gap is getting new people in the door",
+    bar: "The energy and experience is your biggest selling point — the challenge is getting people to take the first step",
+    beauty: "The quality of the service is clearly there — the opportunity is getting in front of the right audience and giving them a reason to book",
+    service: "The expertise is established — the opportunity is local discovery and building trust with a new audience",
+    retail: "The product selection is the differentiator — the gap is driving people from awareness to actually visiting",
+    event_space: "The space sells itself once people see it — the opportunity is consistent exposure to the right audience",
+    app: "The product works — the focus is acquisition and getting the right audience to discover and download",
+    ecommerce: "The product is ready to convert — the opportunity is reaching buyers who don't know you exist yet",
+    gifting: "The product resonates with the right occasion buyer — the challenge is showing up at the right moment",
+  };
+  if (categoryInsight[form.category]) fromWhatYouShared.push(categoryInsight[form.category]!);
+
+  // "Our role is to:" lines
+  const roleLines: string[] = isGrandOpening
+    ? [
+        "Build strong awareness before the doors open",
+        "Create urgency and momentum that drives foot traffic on opening day",
+      ]
+    : form.goals.some((g) => ["Bookings", "E-commerce Sales", "Sign Ups / Downloads"].includes(g))
+    ? [
+        "Increase discovery with the right audience",
+        `Shorten the gap between seeing → ${conversionVerb}ing`,
+      ]
+    : [
+        "Increase awareness and local discovery",
+        "Turn that visibility into real foot traffic and business",
+      ];
+
+  // "Which means:" insight
+  const whyThisWorksInsight = isGrandOpening
+    ? "The opening window is short — every day without awareness is a missed opportunity to build momentum"
+    : form.goals.some((g) => ["Bookings", "E-commerce Sales", "Sign Ups / Downloads"].includes(g))
+    ? `Awareness alone is not enough — people need a clear reason to ${conversionVerb} now`
+    : "Once people discover ${client}, the product does the rest — our role is to increase that discovery";
 
   const recReasons: string[] = [];
   if (form.challenge) recReasons.push(form.challenge.trim().replace(/\.$/, ""));
@@ -1822,15 +1902,14 @@ function buildProposalData(
     recReasons.push("The opening window is critical — multiple touchpoints beat a single post");
     recReasons.push("You need strong awareness before the doors open, not after");
   } else {
-    recReasons.push(`The goal is ${goals.toLowerCase()} — this option is built exactly for that`);
+    recReasons.push(`The goal is ${goals.toLowerCase()} — this option is structured exactly for that`);
     recReasons.push("It keeps the investment efficient while maximizing the right reach");
   }
-  recReasons.push("Performance data from this push tells us exactly where to go next");
 
   const outcomeBullets = [
     isGrandOpening ? "Drive strong foot traffic in the opening window" : `Build measurable ${goals.toLowerCase()} in ${cityLabels}`,
     "Generate real performance data to build on",
-    "Create a foundation for future campaigns",
+    isGrandOpening ? "Make a strong first impression in the market" : "Create a foundation for future campaigns",
   ];
 
   const optionNumbers = [2, 3, 4, 5].slice(0, form.optionsCount - 1);
@@ -1846,14 +1925,15 @@ function buildProposalData(
   const recName = optionNames[form.recommendedOption] ?? `Option ${form.recommendedOption}`;
 
   return {
-    client, cityLabels, goals, isGrandOpening, opener,
-    opt1CityBlocks, selectedPagesList,
-    optionNames, optionBestFor, optionDeliverables, optionWhyItWorks,
+    client, cityLabels, goals, isGrandOpening, opener, businessContext,
+    opt1CityBlocks, selectedPagesList, totalReach,
+    optionNames, optionBestFor, optionDeliverables, optionHowItWorks, optionWhyItWorks,
     optionNumbers, optionPrices, recName, recReasons, outcomeBullets,
-    assetBullets, focusBullets, strategyHook,
+    assetBullets, fromWhatYouShared, roleLines, whyThisWorksInsight, strategyHook,
     notes: form.notes, prDate: form.prDate, contactName: form.contactName,
     recommendedOption: form.recommendedOption,
     caseStudy: form.caseStudy?.trim() ?? "",
+    proposedDirection: form.proposedDirection?.trim() ?? "",
   };
 }
 
@@ -1866,6 +1946,9 @@ function generateProposalText(
   priceOf: (a: AccountSeed) => number
 ): string {
   const d = buildProposalData(form, selectedAccounts, allRelevant, ladder, strategyHook, priceOf);
+  const reachStr = d.totalReach >= 1000000
+    ? `${(d.totalReach / 1000000).toFixed(1)}M+`
+    : d.totalReach >= 1000 ? `${Math.round(d.totalReach / 1000)}K+` : String(d.totalReach);
 
   const opt1Text = d.opt1CityBlocks.length
     ? d.opt1CityBlocks.map((b) => `${b.city} Pages:\n${b.accounts.map((a) => `• ${a.handle} (${a.followers} followers on IG and FB combined) – ${a.price}`).join("\n")}`).join("\n\n")
@@ -1874,7 +1957,7 @@ function generateProposalText(
   let text = `Hi ${d.contactName || "there"},
 
 ${d.opener}
-
+${d.businessContext ? `\n${d.businessContext}\n` : ""}
 As promised, I've put together a few options for you to review.
 
 
@@ -1886,29 +1969,28 @@ The Opportunity
 ${d.client} already has:
 ${d.assetBullets.map((b) => `• ${b}`).join("\n")}
 
-The focus now is:
-${d.focusBullets.map((b) => `• ${b}`).join("\n")}
-
-${d.strategyHook}
-
+The challenge right now is:
+${d.fromWhatYouShared.length ? d.fromWhatYouShared.map((b) => `• ${b}`).join("\n") : `• Building awareness and consistent discovery in ${d.cityLabels}`}
+${d.isGrandOpening ? "• The opening window is short — momentum needs to be built before the doors open\n" : ""}${d.proposedDirection ? `\n${d.proposedDirection}\n` : ""}
 
 Campaign Options
 
 
 Option 1 – Brand Awareness (Page-by-Page)
 
-Best for: Flexibility and full visibility into what's available across ${d.cityLabels}
+Best for: Flexibility — pick individual pages based on budget or market priority
 
 Deliverables (per page):
 1 Feed Post + 2 Story Posts
 
 ${opt1Text}
 
-You can select individual pages based on budget, or combine multiple for stronger reach.`;
+You can select individual pages depending on which markets you want to prioritize, or combine multiple for stronger reach.`;
 
   for (const n of d.optionNumbers) {
     const { price, standard, disc } = d.optionPrices[n];
     const isRec = d.recommendedOption === n;
+    const howItWorks = d.optionHowItWorks[n] ?? [];
     text += `
 
 
@@ -1918,37 +2000,46 @@ Best for: ${d.optionBestFor[n] ?? ""}
 
 Deliverables:
 ${d.optionDeliverables[n]?.items.map((i) => `• ${i}`).join("\n") ?? ""}
+${selectedAccounts.length > 0 ? `\nTotal Network Reach: ~${reachStr} followers` : ""}
+Bundled Investment:
+${fp(price)} (Saving over ${disc}% vs individual pricing)
 
-Pages Included:
-${d.selectedPagesList.join("\n")}
-
-Investment:
-Original Value: ${fp(standard)}
-Bundled Campaign Rate: ${fp(price)} (over ${disc}% in savings)
-
-Why it works:
-${d.optionWhyItWorks[n] ?? ""}`;
+How this works:
+${howItWorks.map((l) => `• ${l}`).join("\n")}`;
   }
 
   text += `
 
 
+Why This Works for ${d.client}
+
+From what you shared:
+${d.fromWhatYouShared.map((b) => `• ${b}`).join("\n")}
+
+Which means:
+• ${d.whyThisWorksInsight}
+
+Our role is to:
+${d.roleLines.map((r) => `• ${r}`).join("\n")}
+${d.caseStudy ? `\n\nFor reference — ${d.caseStudy}` : ""}
+
+
 Recommendation
 
-I'd recommend going with Option ${d.recommendedOption} – ${d.recName}.
-
-${d.notes ? d.notes.trim() + "\n\n" : ""}${d.recReasons.length ? (d.assetBullets[0] ? "Since:\n" : "Given that:\n") + d.recReasons.map((r) => `• ${r}`).join("\n") : ""}
+I'd ${d.recommendedOption === 5 ? "strongly " : ""}recommend going with Option ${d.recommendedOption} – ${d.recName}.
+${d.notes ? `\n${d.notes.trim()}\n` : ""}
+Given:
+${d.recReasons.map((r) => `• ${r}`).join("\n")}
 
 This gives you the best chance to:
 ${d.outcomeBullets.map((b) => `• ${b}`).join("\n")}
-${d.caseStudy ? `\n\nFor reference — ${d.caseStudy}` : ""}
 
 
 Next Steps
 
 ${d.prDate
-    ? `I've put this together ahead of ${d.prDate}. Let me know your thoughts and we can lock everything in.`
-    : "I'd love to walk through this with you. Let me know your thoughts or send over a couple of times that work and I'll make myself available."}
+    ? `I've put this together ahead of ${d.prDate}. Let me know your thoughts and we can lock in dates and messaging.`
+    : "Let me know your thoughts and we can set up a quick call to walk through this together. Happy to adjust based on your priorities."}
 
 Best,
 [AE Name]`;
@@ -1965,69 +2056,83 @@ function generateProposalHTML(
   priceOf: (a: AccountSeed) => number
 ): string {
   const d = buildProposalData(form, selectedAccounts, allRelevant, ladder, strategyHook, priceOf);
+  const reachStr = d.totalReach >= 1000000
+    ? `${(d.totalReach / 1000000).toFixed(1)}M+`
+    : d.totalReach >= 1000 ? `${Math.round(d.totalReach / 1000)}K+` : String(d.totalReach);
 
   const ul = (items: string[]) => `<ul style="margin:6px 0;padding-left:20px">${items.map((i) => `<li>${i}</li>`).join("")}</ul>`;
   const p = (text: string) => `<p style="margin:8px 0">${text}</p>`;
   const h2 = (text: string) => `<h2 style="font-size:18px;font-weight:bold;margin:24px 0 8px">${text}</h2>`;
   const h3 = (text: string) => `<h3 style="font-size:15px;font-weight:bold;margin:20px 0 6px">${text}</h3>`;
+  const h4 = (text: string) => `<h4 style="font-size:13px;font-weight:bold;margin:14px 0 4px;color:#444">${text}</h4>`;
   const hr = () => `<hr style="border:none;border-top:1px solid #e2e8f0;margin:16px 0">`;
   const b = (text: string) => `<strong>${text}</strong>`;
 
   const opt1Blocks = d.opt1CityBlocks.length
     ? d.opt1CityBlocks.map((blk) =>
-        `${p(`${blk.city} Pages:`)}<ul style="margin:4px 0;padding-left:20px">${blk.accounts.map((a) => `<li>${a.handle} (${a.followers} followers on IG and FB combined) – ${a.price}</li>`).join("")}</ul>`
+        `${p(`${b(blk.city + " Pages:")}`)}<ul style="margin:4px 0;padding-left:20px">${blk.accounts.map((a) => `<li>${a.handle} (${a.followers} followers on IG and FB combined) – ${a.price}</li>`).join("")}</ul>`
       ).join("")
     : p("(no pages available for selected markets)");
 
   let html = `<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.6;color:#1a1a1a;max-width:680px">
 ${p(`Hi ${d.contactName || "there"},`)}
 ${p(d.opener)}
+${d.businessContext ? p(d.businessContext) : ""}
 ${p("As promised, I've put together a few options for you to review.")}
 ${hr()}
 ${h2(`${d.client} – ${d.cityLabels} Campaign Strategy`)}
 ${h3("The Opportunity")}
 ${p(`${b(d.client)} already has:`)}
 ${ul(d.assetBullets)}
-${p("The focus now is:")}
-${ul(d.focusBullets)}
-${p(d.strategyHook)}
+${p("The challenge right now is:")}
+${ul(d.fromWhatYouShared.length ? d.fromWhatYouShared : [`Building awareness and consistent discovery in ${d.cityLabels}`])}
+${d.isGrandOpening ? p("With a seasonal opening window, it's important to build momentum early and capitalize on demand.") : ""}
+${d.proposedDirection ? p(`<em>${d.proposedDirection}</em>`) : ""}
 ${hr()}
 ${h2("Campaign Options")}
 ${hr()}
 ${h3("Option 1 – Brand Awareness (Page-by-Page)")}
-${p(`${b("Best for:")} Flexibility and full visibility into what's available across ${d.cityLabels}`)}
+${p(`${b("Best for:")} Flexibility — pick individual pages based on budget or market priority`)}
 ${p(`${b("Deliverables (per page:")}<br>1 Feed Post + 2 Story Posts`)}
 ${opt1Blocks}
-${p("You can select individual pages based on budget, or combine multiple for stronger reach.")}`;
+${p("You can select individual pages depending on which markets you want to prioritize, or combine multiple for stronger reach.")}`;
 
   for (const n of d.optionNumbers) {
     const { price, standard, disc } = d.optionPrices[n];
     const isRec = d.recommendedOption === n;
+    const howItWorks = d.optionHowItWorks[n] ?? [];
     html += `${hr()}
 ${h3(`Option ${n} – ${d.optionNames[n]}${isRec ? " (Recommended)" : ""}`)}
 ${p(`${b("Best for:")} ${d.optionBestFor[n] ?? ""}`)}
 ${p(b("Deliverables:"))}
 ${ul(d.optionDeliverables[n]?.items ?? [])}
-${p(b("Pages Included:"))}
-${ul(d.selectedPagesList)}
-${p(`${b("Investment:")}<br>Original Value: ${fp(standard)}<br>${b(`Bundled Campaign Rate: ${fp(price)}`)} (over ${disc}% in savings)`)}
-${p(`${b("Why it works:")}<br>${d.optionWhyItWorks[n] ?? ""}`)}`;
+${selectedAccounts.length > 0 ? p(`${b("Total Network Reach:")} ~${reachStr} followers`) : ""}
+${p(`${b("Bundled Investment:")}<br>${b(fp(price))} (Saving over ${disc}% vs individual pricing)`)}
+${h4("How this works")}
+${ul(howItWorks)}`;
   }
 
   html += `${hr()}
+${h2(`Why This Works for ${d.client}`)}
+${p(b("From what you shared:"))}
+${ul(d.fromWhatYouShared.length ? d.fromWhatYouShared : [`The focus is building awareness and discovery in ${d.cityLabels}`])}
+${p(`${b("Which means:")}<br>${d.whyThisWorksInsight}`)}
+${p(b("Our role is to:"))}
+${ul(d.roleLines)}
+${d.caseStudy ? p(`For reference — ${d.caseStudy}`) : ""}
+${hr()}
 ${h2("Recommendation")}
-${p(`I'd recommend going with ${b(`Option ${d.recommendedOption} – ${d.recName}`)}.`)}
+${p(`I'd ${d.recommendedOption === 5 ? "strongly " : ""}recommend going with ${b(`Option ${d.recommendedOption} – ${d.recName}`)}.`)}
 ${d.notes ? p(d.notes.trim()) : ""}
-${p(d.recReasons.length ? (d.assetBullets[0] ? "Since:" : "Given that:") : "")}
+${p("Given:")}
 ${ul(d.recReasons)}
 ${p("This gives you the best chance to:")}
 ${ul(d.outcomeBullets)}
-${d.caseStudy ? p(`For reference — ${d.caseStudy}`) : ""}
 ${hr()}
 ${h2("Next Steps")}
 ${p(d.prDate
-    ? `I've put this together ahead of ${d.prDate}. Let me know your thoughts and we can lock everything in.`
-    : "I'd love to walk through this with you. Let me know your thoughts or send over a couple of times that work and I'll make myself available.")}
+    ? `I've put this together ahead of ${d.prDate}. Let me know your thoughts and we can lock in dates and messaging.`
+    : "Let me know your thoughts and we can set up a quick call to walk through this together. Happy to adjust based on your priorities.")}
 ${p("Best,<br>[AE Name]")}
 </div>`;
 

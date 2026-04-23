@@ -1,17 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { AppNav } from "@/components/ui/app-nav";
-import { Sparkles, FileText, Clock, Search, ChevronRight, Copy, Check } from "lucide-react";
+import { Sparkles, FileText, Clock, Search, Copy, Check, ThumbsUp, ThumbsDown, Send, Trophy } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { formatCurrency } from "@/lib/pricing";
 import type { LadderPrices } from "@/lib/pricing";
 import { ACCOUNTS_SEED, type AccountSeed } from "@/lib/accounts-seed";
 import IOGeneratorModal from "@/components/proposal/IOGeneratorModal";
+
+type FeedbackState = { status: string; rating: number };
+type FeedbackMap = Record<string, FeedbackState>;
 
 type Proposal = {
   id: string;
@@ -80,12 +83,16 @@ function proposalToIOProps(p: Proposal): {
 
 function ProposalDrawer({
   proposal,
+  feedback,
   onClose,
   onGenerateIO,
+  onFeedback,
 }: {
   proposal: Proposal;
+  feedback: FeedbackState | null;
   onClose: () => void;
   onGenerateIO: () => void;
+  onFeedback: (proposalId: string, update: Partial<FeedbackState>) => void;
 }) {
   const [copied, setCopied] = useState(false);
 
@@ -100,6 +107,13 @@ function ProposalDrawer({
   const deal = proposal.deals;
   const opt2 = proposal.ladder_data?.option2Price;
   const accounts = proposal.selected_accounts ?? [];
+  const fb = feedback ?? { status: "draft", rating: 0 };
+
+  const statusBtns = [
+    { key: "sent", label: "Mark as Sent", icon: <Send className="h-3 w-3" /> },
+    { key: "won",  label: "Mark as Won",  icon: <Trophy className="h-3 w-3" /> },
+    { key: "lost", label: "Mark as Lost", icon: null },
+  ] as const;
 
   return (
     <div className="fixed inset-0 z-50 flex">
@@ -114,6 +128,15 @@ function ProposalDrawer({
               {deal?.status && (
                 <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${DEAL_STATUS[deal.status]?.color ?? "bg-slate-100 text-slate-600"}`}>
                   {DEAL_STATUS[deal.status]?.label ?? deal.status}
+                </span>
+              )}
+              {fb.status !== "draft" && (
+                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                  fb.status === "won" ? "bg-green-100 text-green-700" :
+                  fb.status === "sent" ? "bg-blue-100 text-blue-700" :
+                  fb.status === "lost" ? "bg-red-100 text-red-600" : "bg-slate-100 text-slate-600"
+                }`}>
+                  {fb.status === "won" ? "Won" : fb.status === "sent" ? "Sent" : fb.status === "lost" ? "Lost" : fb.status}
                 </span>
               )}
               {opt2 && <span className="text-sm font-semibold text-slate-700">{formatCurrency(opt2)}</span>}
@@ -151,12 +174,7 @@ function ProposalDrawer({
             {copied ? <Check className="h-3.5 w-3.5 text-green-600" /> : <Copy className="h-3.5 w-3.5" />}
             {copied ? "Copied!" : "Copy Text"}
           </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={onGenerateIO}
-            className="gap-1.5 border-[#E8192C] text-[#E8192C] hover:bg-red-50"
-          >
+          <Button size="sm" variant="outline" onClick={onGenerateIO} className="gap-1.5 border-[#E8192C] text-[#E8192C] hover:bg-red-50">
             <FileText className="h-3.5 w-3.5" />
             Generate IO
           </Button>
@@ -166,9 +184,47 @@ function ProposalDrawer({
               New Proposal
             </Link>
           </Button>
-          <Button size="sm" variant="outline" asChild>
-            <Link href="/deals">View in Pipeline →</Link>
-          </Button>
+        </div>
+
+        {/* Feedback bar */}
+        <div className="px-6 py-3 border-b bg-slate-50 flex items-center gap-3 flex-wrap">
+          <span className="text-xs text-slate-500 font-medium">How did this land?</span>
+          <div className="flex gap-1.5">
+            <button
+              onClick={() => onFeedback(proposal.id, { rating: fb.rating === 1 ? 0 : 1 })}
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium border transition-all ${
+                fb.rating === 1 ? "bg-green-100 text-green-700 border-green-300" : "bg-white text-slate-500 border-slate-200 hover:bg-green-50 hover:text-green-600"
+              }`}
+            >
+              <ThumbsUp className="h-3 w-3" /> Good
+            </button>
+            <button
+              onClick={() => onFeedback(proposal.id, { rating: fb.rating === -1 ? 0 : -1 })}
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium border transition-all ${
+                fb.rating === -1 ? "bg-red-100 text-red-600 border-red-300" : "bg-white text-slate-500 border-slate-200 hover:bg-red-50 hover:text-red-500"
+              }`}
+            >
+              <ThumbsDown className="h-3 w-3" /> Needs work
+            </button>
+          </div>
+          <div className="flex gap-1.5 ml-auto">
+            {statusBtns.map(({ key, label, icon }) => (
+              <button
+                key={key}
+                onClick={() => onFeedback(proposal.id, { status: fb.status === key ? "draft" : key })}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium border transition-all ${
+                  fb.status === key
+                    ? key === "won" ? "bg-green-100 text-green-700 border-green-300"
+                      : key === "sent" ? "bg-blue-100 text-blue-700 border-blue-300"
+                      : "bg-red-100 text-red-600 border-red-300"
+                    : "bg-white text-slate-500 border-slate-200 hover:bg-slate-100"
+                }`}
+              >
+                {icon}
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Proposal text */}
@@ -193,12 +249,56 @@ export default function ProposalsPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [selected, setSelected] = useState<Proposal | null>(null);
   const [ioProposal, setIoProposal] = useState<Proposal | null>(null);
+  const [feedbackMap, setFeedbackMap] = useState<FeedbackMap>({});
 
   useEffect(() => {
     fetch("/api/proposals")
       .then((r) => r.json())
-      .then(({ data }) => { setProposals(data ?? []); setLoading(false); });
+      .then(({ data }) => {
+        const list: Proposal[] = data ?? [];
+        setProposals(list);
+        setLoading(false);
+        // Load feedback for all proposals in parallel
+        Promise.all(
+          list.map((p) =>
+            fetch(`/api/proposals/feedback?proposalId=${p.id}`)
+              .then((r) => r.json())
+              .then((fb) => ({ id: p.id, fb }))
+              .catch(() => ({ id: p.id, fb: null }))
+          )
+        ).then((results) => {
+          const map: FeedbackMap = {};
+          results.forEach(({ id, fb }) => {
+            if (fb) map[id] = { status: fb.status ?? "draft", rating: fb.rating ?? 0 };
+          });
+          setFeedbackMap(map);
+        });
+      });
   }, []);
+
+  const handleFeedback = useCallback(async (proposalId: string, update: Partial<FeedbackState>) => {
+    const current = feedbackMap[proposalId] ?? { status: "draft", rating: 0 };
+    const next = { ...current, ...update };
+    // Optimistic update
+    setFeedbackMap((m) => ({ ...m, [proposalId]: next }));
+    // Also update selected if it's open
+    setSelected((s) => s?.id === proposalId ? { ...s } : s);
+
+    const proposal = proposals.find((p) => p.id === proposalId);
+    const intakeData = proposal?.intake_data ?? {};
+    await fetch("/api/proposals/feedback", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        proposalId,
+        status: next.status,
+        rating: next.rating,
+        businessCategory: intakeData.businessCategory as string | undefined,
+        markets: proposal?.deals?.cities ?? [],
+        goals: intakeData.goals as string[] | undefined,
+      }),
+    });
+  }, [feedbackMap, proposals]);
 
   const filtered = proposals.filter((p) => {
     const q = search.toLowerCase();
@@ -362,13 +462,37 @@ export default function ProposalsPage() {
                           {new Date(p.created_at).toLocaleDateString("en-CA", { month: "short", day: "numeric" })}
                         </td>
                         <td className="px-4 py-3">
-                          <button
-                            onClick={(e) => { e.stopPropagation(); setIoProposal(p); }}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-[#E8192C] border border-[#E8192C]/30 rounded-lg hover:bg-red-50 transition-colors whitespace-nowrap"
-                          >
-                            <FileText className="h-3 w-3" />
-                            IO
-                          </button>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setIoProposal(p); }}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-[#E8192C] border border-[#E8192C]/30 rounded-lg hover:bg-red-50 transition-colors whitespace-nowrap"
+                            >
+                              <FileText className="h-3 w-3" />
+                              IO
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleFeedback(p.id, { rating: (feedbackMap[p.id]?.rating ?? 0) === 1 ? 0 : 1 }); }}
+                              className={`p-1.5 rounded-lg border transition-all ${
+                                (feedbackMap[p.id]?.rating ?? 0) === 1
+                                  ? "bg-green-100 text-green-700 border-green-300"
+                                  : "bg-white text-slate-400 border-slate-200 hover:text-green-600 hover:bg-green-50"
+                              }`}
+                              title="Good proposal"
+                            >
+                              <ThumbsUp className="h-3 w-3" />
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleFeedback(p.id, { rating: (feedbackMap[p.id]?.rating ?? 0) === -1 ? 0 : -1 }); }}
+                              className={`p-1.5 rounded-lg border transition-all ${
+                                (feedbackMap[p.id]?.rating ?? 0) === -1
+                                  ? "bg-red-100 text-red-600 border-red-300"
+                                  : "bg-white text-slate-400 border-slate-200 hover:text-red-500 hover:bg-red-50"
+                              }`}
+                              title="Needs work"
+                            >
+                              <ThumbsDown className="h-3 w-3" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -384,8 +508,10 @@ export default function ProposalsPage() {
       {selected && (
         <ProposalDrawer
           proposal={selected}
+          feedback={feedbackMap[selected.id] ?? null}
           onClose={() => setSelected(null)}
           onGenerateIO={() => { setSelected(null); setIoProposal(selected); }}
+          onFeedback={handleFeedback}
         />
       )}
 

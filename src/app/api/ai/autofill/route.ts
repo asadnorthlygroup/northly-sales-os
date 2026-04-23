@@ -1,7 +1,41 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { createClient } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+async function fetchWinningExamples(category?: string): Promise<string> {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) return "";
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY
+  );
+  let query = supabase
+    .from("proposal_feedback")
+    .select("notes, business_category, markets, goals, proposals(generated_text, intake_data)")
+    .in("status", ["won", "sent"])
+    .eq("rating", 1)
+    .order("updated_at", { ascending: false })
+    .limit(3);
+  if (category) query = query.eq("business_category", category);
+
+  const { data } = await query;
+  if (!data || data.length === 0) return "";
+
+  return data.map((ex, i) => {
+    const proposalArr = ex.proposals as unknown;
+    const proposal = Array.isArray(proposalArr) ? proposalArr[0] : proposalArr;
+    const intake = (proposal as { intake_data?: Record<string, unknown> } | null)?.intake_data ?? {};
+    const snippet = ((proposal as { generated_text?: string | null } | null)?.generated_text ?? "")
+      .substring(0, 600);
+    return `Example ${i + 1} (${ex.business_category ?? "unknown"} — ${(ex.markets ?? []).join(", ")}):
+Goals: ${(ex.goals ?? []).join(", ")}
+Challenge: ${(intake as Record<string, string>).challenge ?? ""}
+Proposed direction excerpt: ${(intake as Record<string, string>).proposedDirection ?? ""}
+Proposal opening excerpt: ${snippet}
+AE notes: ${ex.notes ?? "(none)"}`;
+  }).join("\n\n---\n\n");
+}
 
 export async function POST(request: NextRequest) {
   const { type, website, transcript, businessName, goals, category, cities, challenge } = await request.json();
@@ -72,6 +106,11 @@ Return ONLY valid JSON, no other text. Never include phrases like "Based on the 
     }
 
     if (type === "direction") {
+      const winningExamples = await fetchWinningExamples(category);
+      const examplesBlock = winningExamples
+        ? `\n\nHere are real proposals that landed well with similar clients (rated positively by AEs):\n\n${winningExamples}\n\nUse these as reference for tone, sequencing style, and framing — adapt to the new client's specifics.`
+        : "";
+
       const message = await client.messages.create({
         model: "claude-haiku-4-5-20251001",
         max_tokens: 400,
@@ -85,7 +124,7 @@ Business: ${businessName || "the client"}
 Category: ${category || ""}
 Goals: ${(goals || []).join(", ") || "awareness"}
 Markets: ${(cities || []).join(", ") || ""}
-Challenge: ${challenge || ""}
+Challenge: ${challenge || ""}${examplesBlock}
 
 RULES:
 - Think like a media planner, not a generic marketer
