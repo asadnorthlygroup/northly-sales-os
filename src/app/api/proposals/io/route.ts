@@ -232,10 +232,18 @@ export async function POST(request: NextRequest) {
   const { id: docId } = await copyRes.json();
 
   // 2. Move to Drive folder
-  await fetch(
+  const moveRes = await fetch(
     `https://www.googleapis.com/drive/v3/files/${docId}?addParents=${DRIVE_FOLDER_ID}&removeParents=root`,
     { method: "PATCH", headers: ah }
   );
+  if (!moveRes.ok) {
+    const moveErr = await moveRes.text();
+    return NextResponse.json({
+      error: "no_folder_access",
+      message: "Doc was created but could not be moved to the shared folder. Ask management@northlygroup.com to share the IO folder with your account as Editor.",
+      detail: moveErr,
+    }, { status: 403 });
+  }
 
   // 3. Replace all placeholders
   const replacements: [string, string][] = [
