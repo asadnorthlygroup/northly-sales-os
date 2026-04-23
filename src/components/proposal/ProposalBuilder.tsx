@@ -259,7 +259,12 @@ export default function ProposalBuilder() {
       if (form.customPrices[account.handle] !== undefined) {
         return form.customPrices[account.handle];
       }
-      let price = applyFlatMarkup(account.baseRate, DEFAULT_PRICING_CONFIG);
+      let price: number;
+      if (form.markupMode === "percentage") {
+        price = roundProposalPrice(account.baseRate * (1 + form.markupPercentage / 100));
+      } else {
+        price = applyFlatMarkup(account.baseRate, DEFAULT_PRICING_CONFIG);
+      }
       if (form.collaboratorHandles.includes(account.handle)) {
         if (form.collaboratorAdjustMode === "discount") {
           price = roundProposalPrice(price * (1 - form.collaboratorAdjustValue / 100));
@@ -269,7 +274,7 @@ export default function ProposalBuilder() {
       }
       return price;
     },
-    [form.customPrices, form.collaboratorHandles, form.collaboratorAdjustMode, form.collaboratorAdjustValue]
+    [form.customPrices, form.collaboratorHandles, form.collaboratorAdjustMode, form.collaboratorAdjustValue, form.markupMode, form.markupPercentage]
   );
 
   const selectedBaseTotal = useMemo(
@@ -1000,10 +1005,9 @@ function Step2Strategy({
             <Select
               value={form.markupPercentage === 20 ? "small" : form.markupPercentage === 40 ? "large" : "custom"}
               onValueChange={(v) => {
-                if (v === "small") update("markupPercentage", 20);
-                else if (v === "large") update("markupPercentage", 40);
-                // custom: leave markupPercentage as-is, user edits below
-                update("markupMode", "percentage");
+                if (v === "small") setForm((f) => ({ ...f, markupMode: "percentage", markupPercentage: 20 }));
+                else if (v === "large") setForm((f) => ({ ...f, markupMode: "percentage", markupPercentage: 40 }));
+                else setForm((f) => ({ ...f, markupMode: "percentage", markupPercentage: f.markupPercentage === 20 || f.markupPercentage === 40 ? 30 : f.markupPercentage }));
               }}
             >
               <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
