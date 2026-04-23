@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,10 +8,88 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Loader2, FileText, ExternalLink, Plus, Trash2 } from "lucide-react";
+import { Loader2, FileText, ExternalLink, MapPin } from "lucide-react";
 import { formatCurrency } from "@/lib/pricing";
 import type { AccountSeed } from "@/lib/accounts-seed";
 import type { LadderPrices } from "@/lib/pricing";
+
+// ─── Google Places autocomplete hook ──────────────────────────────────────────
+const PROVINCE_MAP: Record<string, string> = {
+  "Alberta": "AB", "British Columbia": "BC", "Manitoba": "MB",
+  "New Brunswick": "NB", "Newfoundland and Labrador": "NL", "Nova Scotia": "NS",
+  "Northwest Territories": "NT", "Nunavut": "NU", "Ontario": "ON",
+  "Prince Edward Island": "PE", "Quebec": "QC", "Saskatchewan": "SK", "Yukon": "YT",
+};
+
+function usePlacesAutocomplete(
+  inputRef: React.RefObject<HTMLInputElement | null>,
+  onPlace: (parts: { street: string; city: string; province: string; postal: string }) => void
+) {
+  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
+
+  useEffect(() => {
+    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+    if (!apiKey || !inputRef.current) return;
+
+    // Load the Maps JS SDK if not already present
+    const scriptId = "google-maps-places";
+    if (!document.getElementById(scriptId)) {
+      const script = document.createElement("script");
+      script.id = scriptId;
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
+      script.async = true;
+      script.defer = true;
+      document.head.appendChild(script);
+      script.onload = () => initAutocomplete();
+    } else if (window.google?.maps?.places) {
+      initAutocomplete();
+    } else {
+      // Script tag exists but not yet loaded — wait
+      const existing = document.getElementById(scriptId) as HTMLScriptElement;
+      existing.addEventListener("load", initAutocomplete);
+      return () => existing.removeEventListener("load", initAutocomplete);
+    }
+
+    function initAutocomplete() {
+      if (!inputRef.current || autocompleteRef.current) return;
+      const ac = new window.google.maps.places.Autocomplete(inputRef.current, {
+        componentRestrictions: { country: "ca" },
+        fields: ["address_components"],
+        types: ["address"],
+      });
+      autocompleteRef.current = ac;
+      ac.addListener("place_changed", () => {
+        const place = ac.getPlace();
+        if (!place.address_components) return;
+
+        let streetNumber = "", route = "", city = "", provinceLong = "", postal = "";
+        for (const comp of place.address_components) {
+          const t = comp.types;
+          if (t.includes("street_number")) streetNumber = comp.long_name;
+          else if (t.includes("route")) route = comp.long_name;
+          else if (t.includes("locality")) city = comp.long_name;
+          else if (t.includes("administrative_area_level_1")) provinceLong = comp.long_name;
+          else if (t.includes("postal_code")) postal = comp.long_name;
+        }
+
+        onPlace({
+          street: [streetNumber, route].filter(Boolean).join(" "),
+          city,
+          province: PROVINCE_MAP[provinceLong] ?? "ON",
+          postal,
+        });
+      });
+    }
+
+    return () => {
+      if (autocompleteRef.current) {
+        window.google?.maps?.event?.clearInstanceListeners(autocompleteRef.current);
+        autocompleteRef.current = null;
+      }
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+}
 
 const PROVINCES = [
   { code: "AB", name: "Alberta" },
@@ -88,11 +166,22 @@ export default function IOGeneratorModal({
 }: IOGeneratorModalProps) {
   const [optionNumber, setOptionNumber] = useState<number>(Math.min(optionsCount, 2));
   const [contactName, setContactName] = useState("");
-  const [clientLegalName, setClientLegalName] = useState("");
+  const [clientLegalName, setClientLegalName] = useState(businessName);
   const [clientStreet, setClientStreet] = useState("");
   const [clientCity, setClientCity] = useState("");
   const [clientProvince, setClientProvince] = useState("ON");
   const [clientPostal, setClientPostal] = useState("");
+  const streetInputRef = useRef<HTMLInputElement>(null);
+  const hasPlacesKey = !!process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+
+  const handlePlaceSelect = useCallback((parts: { street: string; city: string; province: string; postal: string }) => {
+    if (parts.street) setClientStreet(parts.street);
+    if (parts.city) setClientCity(parts.city);
+    if (parts.province) setClientProvince(parts.province);
+    if (parts.postal) setClientPostal(parts.postal);
+  }, []);
+
+  usePlacesAutocomplete(streetInputRef, handlePlaceSelect);
   const [clientEmail, setClientEmail] = useState("");
   const [serviceStartDate, setServiceStartDate] = useState("");
   const [campaignEndDate, setCampaignEndDate] = useState("");
@@ -285,7 +374,21 @@ export default function IOGeneratorModal({
                   <Input value={clientLegalName} onChange={(e) => setClientLegalName(e.target.value)} placeholder={businessName} />
                 </Field>
                 <Field label="Street address">
-                  <Input value={clientStreet} onChange={(e) => setClientStreet(e.target.value)} placeholder="290 Picton Ave., Suite 103" />
+                  <div className="relative">
+                    <Input
+                      ref={streetInputRef}
+                      value={clientStreet}
+                      onChange={(e) => setClientStreet(e.target.value)}
+                      placeholder="290 Picton Ave., Suite 103"
+                      className={hasPlacesKey ? "pr-8" : ""}
+                    />
+                    {hasPlacesKey && (
+                      <MapPin className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+                    )}
+                  </div>
+                  {hasPlacesKey && (
+                    <p className="text-xs text-slate-400 mt-1">Start typing — city, province, and postal will fill automatically.</p>
+                  )}
                 </Field>
                 <div className="grid grid-cols-2 gap-3">
                   <Field label="City">
