@@ -4,6 +4,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { ACCOUNTS_SEED } from "@/lib/accounts-seed";
 import { formatCurrency } from "@/lib/pricing";
 
+const TEMPLATE_DOC_ID = "19HpFMnB48ur0WxhNT4e6owWOni9sbAK4_qoWdVSMgno";
 const DRIVE_FOLDER_ID = "1niP6cYzjtISrUy9pIWYY3OWNQttGkFZf";
 
 const PROVINCE_TAX: Record<string, { name: string; rate: number }> = {
@@ -21,56 +22,6 @@ const PROVINCE_TAX: Record<string, { name: string; rate: number }> = {
   NU: { name: "GST", rate: 0.05 },
   YT: { name: "GST", rate: 0.05 },
 };
-
-type DocLine = {
-  text: string;
-  bold?: boolean;
-  italic?: boolean;
-  fontSize?: number;
-  alignment?: "CENTER" | "LEFT";
-};
-
-function buildDocRequests(lines: DocLine[]): unknown[] {
-  const fullText = lines.map((l) => l.text + "\n").join("");
-  const requests: unknown[] = [
-    { insertText: { location: { index: 1 }, text: fullText } },
-  ];
-
-  let idx = 1;
-  for (const line of lines) {
-    const len = line.text.length;
-    if (len > 0) {
-      const textStyle: Record<string, unknown> = {};
-      const fields: string[] = [];
-      if (line.bold) { textStyle.bold = true; fields.push("bold"); }
-      if (line.italic) { textStyle.italic = true; fields.push("italic"); }
-      if (line.fontSize) {
-        textStyle.fontSize = { magnitude: line.fontSize, unit: "PT" };
-        fields.push("fontSize");
-      }
-      if (fields.length > 0) {
-        requests.push({
-          updateTextStyle: {
-            range: { startIndex: idx, endIndex: idx + len },
-            textStyle,
-            fields: fields.join(","),
-          },
-        });
-      }
-      if (line.alignment) {
-        requests.push({
-          updateParagraphStyle: {
-            range: { startIndex: idx, endIndex: idx + len + 1 },
-            paragraphStyle: { alignment: line.alignment },
-            fields: "alignment",
-          },
-        });
-      }
-    }
-    idx += line.text.length + 1;
-  }
-  return requests;
-}
 
 function fmtDate(dateStr: string): string {
   if (!dateStr) return "TBD";
@@ -124,6 +75,35 @@ function getDeliverables(n: number, count: number): string[] {
   }
 }
 
+// Google Docs structure types
+type GElement = { textRun?: { content?: string } };
+type GContent = { paragraph?: { elements?: GElement[] }; startIndex?: number };
+type GCell = { content?: GContent[]; startIndex?: number; endIndex?: number };
+type GRow = { tableCells?: GCell[]; startIndex?: number };
+type GTable = { tableRows?: GRow[]; startIndex?: number };
+type GBodyEl = { table?: GTable };
+
+function cellText(cell: GCell): string {
+  return (cell.content ?? [])
+    .flatMap((c) => c.paragraph?.elements ?? [])
+    .map((e) => e.textRun?.content ?? "")
+    .join("")
+    .trim();
+}
+
+function findBillingTable(content: GBodyEl[]): GTable | null {
+  for (const el of content) {
+    if (!el.table) continue;
+    for (const row of el.table.tableRows ?? []) {
+      const texts = (row.tableCells ?? []).map(cellText);
+      if (texts.some((t) => t.includes("Invoice #")) && texts.some((t) => t.includes("Campaign Term"))) {
+        return el.table;
+      }
+    }
+  }
+  return null;
+}
+
 export async function POST(request: NextRequest) {
   const cookieStore = await cookies();
   const supabase = createServerClient(
@@ -154,17 +134,19 @@ export async function POST(request: NextRequest) {
   const {
     optionNumber,
     businessName,
+    contactName,
     clientLegalName,
     clientStreet,
     clientCity,
     clientProvince,
     clientPostal,
     clientEmail,
-    offerExpiry,
     serviceStartDate,
     campaignEndDate,
     storyServicesType,
     storyServicesNote,
+    storyRate,
+    storyQty,
     paymentType,
     paymentSchedule,
     specialConditions,
@@ -174,17 +156,19 @@ export async function POST(request: NextRequest) {
   } = body as {
     optionNumber: number;
     businessName: string;
+    contactName: string;
     clientLegalName: string;
     clientStreet: string;
     clientCity: string;
     clientProvince: string;
     clientPostal: string;
     clientEmail: string;
-    offerExpiry: string;
     serviceStartDate: string;
     campaignEndDate: string;
     storyServicesType: string;
     storyServicesNote: string;
+    storyRate: number;
+    storyQty: number;
     paymentType: string;
     paymentSchedule: Array<{ date: string; amount: string }>;
     specialConditions: string;
@@ -193,187 +177,176 @@ export async function POST(request: NextRequest) {
     markets: string[];
   };
 
-  // Tax
   const tax = PROVINCE_TAX[clientProvince?.toUpperCase()] ?? PROVINCE_TAX.ON;
   const subtotal = optionPrice ?? 0;
   const taxAmount = Math.round(subtotal * tax.rate * 100) / 100;
   const total = subtotal + taxAmount;
 
-  // Accounts + followers
   const accounts = selectedAccountHandles
     .map((h) => ACCOUNTS_SEED.find((a) => a.handle === h))
     .filter(Boolean);
   const totalFollowers = accounts.reduce((s, a) => s + (a?.followers ?? 0), 0);
-  const formattedFollowers = new Intl.NumberFormat("en-CA").format(totalFollowers);
 
-  // Story services text
+  const deliverables = getDeliverables(optionNumber, accounts.length);
+  const delivText = [
+    ...deliverables.map((d) => `• ${d}`),
+    "",
+    `Pages: ${selectedAccountHandles.join(", ")}`,
+    `Reach: ${new Intl.NumberFormat("en-CA").format(totalFollowers)} followers across ${accounts.length} accounts`,
+  ].join("\n");
+
   let storyText = "";
   if (storyServicesType === "complementary") {
-    storyText = `Story slides are included as complementary support posts on each account involved in this campaign (${selectedAccountHandles.join(", ")}).`;
+    storyText = `Story slides included as complementary support posts on ${selectedAccountHandles.join(", ")}.`;
   } else if (storyServicesType === "full_price") {
-    storyText = "Story slides are billed as standalone deliverables on each account at the standard story rate.";
+    storyText = "Story slides billed as standalone deliverables at standard story rate.";
   } else {
     storyText = storyServicesNote || "Story services as per agreement.";
   }
 
-  // Payment text
-  let paymentText = "";
-  if (paymentType === "single") {
-    paymentText = `Single payment of ${formatCurrency(total)} (incl. applicable tax) due upon signing.`;
-  } else {
-    paymentText = (paymentSchedule ?? [])
-      .map((p, i) => `Payment ${i + 1}: ${p.amount} — due ${fmtDate(p.date)}`)
-      .join("\n");
-  }
+  const storyRateVal = storyServicesType === "complementary" ? 0 : (storyRate || 0);
+  const storyQtyVal = storyQty || 1;
+  const storyFee = storyRateVal * storyQtyVal;
+  const storyLabel = storyServicesType === "complementary" ? "Story Services (Complimentary)" : "Story Services";
 
-  const DIV = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
-  const deliverables = getDeliverables(optionNumber, accounts.length);
-  const marketsStr = Array.isArray(markets) ? markets.join(", ") : (markets ?? "");
+  const payment1Amount = paymentType === "single"
+    ? total
+    : Number(paymentSchedule?.[0]?.amount || total);
+  const payment1Terms = paymentType === "single"
+    ? "Due upon signing"
+    : (paymentSchedule?.[0]?.date ? `Due ${fmtDate(paymentSchedule[0].date)}` : "Due upon signing");
 
-  const lines: DocLine[] = [
-    { text: "NORTHLY GROUP", bold: true, fontSize: 18, alignment: "CENTER" },
-    { text: "INSERTION ORDER", bold: true, fontSize: 14, alignment: "CENTER" },
-    { text: "" },
-    { text: DIV },
-    { text: "" },
-    { text: "CLIENT DETAILS", bold: true, fontSize: 12 },
-    { text: "" },
-    { text: `Customer:          ${businessName}` },
-    { text: `Company:           ${clientLegalName || businessName}` },
-    { text: `Address:           ${clientStreet}` },
-    { text: `                   ${clientCity}, ${clientProvince}  ${clientPostal}` },
-    { text: `                   Canada` },
-    { text: `Invoice Email:     ${clientEmail}` },
-    { text: `Offer Expiry:      ${fmtDate(offerExpiry)}` },
-    { text: `Service Start:     ${fmtDate(serviceStartDate)}` },
-    { text: `Invoice #:         To be assigned upon deal close` },
-    { text: "" },
-    { text: DIV },
-    { text: "" },
-    { text: "SECTION 1 — CAMPAIGN SERVICES", bold: true, fontSize: 12 },
-    { text: "" },
-    { text: `Item:       Northly Group Marketing Package — ${getOptionLabel(optionNumber)}`, bold: true },
-    { text: `Markets:    ${marketsStr}` },
-    { text: "" },
-    { text: "Deliverables:", bold: true },
-    ...deliverables.map((d) => ({ text: `  • ${d}` })),
-    { text: "" },
-    { text: "Pages Included:", bold: true },
-    { text: `  ${selectedAccountHandles.join("   ")}` },
-    { text: "" },
-    { text: `Total Following Reach:   ${formattedFollowers} followers across ${accounts.length} accounts`, bold: true },
-    { text: "" },
-    { text: `Qty:        1` },
-    { text: `Rate:       ${formatCurrency(subtotal)}` },
-    { text: `Amount:     ${formatCurrency(subtotal)}` },
-    { text: "" },
-    { text: `Special Conditions:   ${specialConditions?.trim() || "None"}` },
-    { text: "" },
-    { text: DIV },
-    { text: "" },
-    { text: "SECTION 2 — STORY SERVICES", bold: true, fontSize: 12 },
-    { text: "" },
-    { text: storyText },
-    { text: "" },
-    { text: DIV },
-    { text: "" },
-    { text: "BILLING & PAYMENT", bold: true, fontSize: 12 },
-    { text: "" },
-    { text: `Campaign Term:      ${fmtDate(serviceStartDate)} — ${fmtDate(campaignEndDate)}` },
-    { text: "" },
-    { text: "Payment Schedule:", bold: true },
-    { text: paymentText },
-    { text: "" },
-    { text: DIV },
-    { text: "" },
-    { text: "PRICING SUMMARY", bold: true, fontSize: 12 },
-    { text: "" },
-    { text: `Subtotal:                                ${formatCurrency(subtotal)}` },
-    { text: `${tax.name} @ ${(tax.rate * 100).toFixed(3).replace(/\.?0+$/, "")}%:    ${formatCurrency(taxAmount)}` },
-    { text: `                                         ──────────────────` },
-    { text: `TOTAL:                                   ${formatCurrency(total)}`, bold: true },
-    { text: "" },
-    { text: `BALANCE DUE:                             ${formatCurrency(total)}`, bold: true },
-    { text: "" },
-    { text: DIV },
-    { text: "" },
-    { text: "VENDOR", bold: true, fontSize: 12 },
-    { text: "" },
-    { text: "Name:       Asad Rahman" },
-    { text: "Title:      Director, Northly Group" },
-    { text: "Company:    WAVEROOMTV INC." },
-    { text: "Address:    305 Milner Avenue, Suite 700" },
-    { text: "            Scarborough, Toronto ON M1B 3V4" },
-    { text: "Email:      management@northlygroup.com" },
-    { text: "GST/HST:    752988071RT0001" },
-    { text: "" },
-    { text: "Authorized Signature:" },
-    { text: "" },
-    { text: "________________________                    Date: _______________" },
-    { text: "" },
-    { text: DIV },
-    { text: "" },
-    { text: "CLIENT AUTHORIZATION", bold: true, fontSize: 12 },
-    { text: "" },
-    { text: "By signing below, the client agrees to the terms of this Insertion Order and authorizes" },
-    { text: "WAVEROOMTV INC. (Northly Group) to proceed with the campaign as outlined above." },
-    { text: "" },
-    { text: "Client Signature:    ________________________                Date: _______________" },
-    { text: "" },
-    { text: "Client Name (Print): ________________________" },
-    { text: "" },
-    { text: DIV },
-    { text: "" },
-    { text: "Please submit payment via E-transfer to payments@waveroomtv.com", italic: true, alignment: "CENTER" },
-  ];
-
-  const docRequests = buildDocRequests(lines);
   const dateStr = new Date().toISOString().slice(0, 10);
   const docTitle = `IO — ${businessName} — Option ${optionNumber} — ${dateStr}`;
+  const ah = { Authorization: `Bearer ${providerToken}`, "Content-Type": "application/json" };
 
-  // 1. Create document
-  const createRes = await fetch("https://docs.googleapis.com/v1/documents", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${providerToken}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ title: docTitle }),
-  });
-  if (!createRes.ok) {
-    const err = await createRes.text();
-    console.error("Docs create error:", err);
-    return NextResponse.json({ error: "Failed to create Google Doc" }, { status: 500 });
+  // 1. Copy template
+  const copyRes = await fetch(
+    `https://www.googleapis.com/drive/v3/files/${TEMPLATE_DOC_ID}/copy`,
+    { method: "POST", headers: ah, body: JSON.stringify({ name: docTitle }) }
+  );
+  if (!copyRes.ok) {
+    const err = await copyRes.text();
+    return NextResponse.json({ error: "Failed to copy IO template", detail: err }, { status: 500 });
   }
-  const doc = await createRes.json();
-  const docId = doc.documentId;
+  const { id: docId } = await copyRes.json();
 
-  // 2. Insert content + formatting
+  // 2. Move to Drive folder
+  await fetch(
+    `https://www.googleapis.com/drive/v3/files/${docId}?addParents=${DRIVE_FOLDER_ID}&removeParents=root`,
+    { method: "PATCH", headers: ah }
+  );
+
+  // 3. Replace all placeholders
+  const replacements: [string, string][] = [
+    ["{{BUSINESS_NAME}}", businessName],
+    ["{{CLIENT_LEGAL_NAME}}", clientLegalName || businessName],
+    ["{{CLIENT_STREET}}", clientStreet || ""],
+    ["{{CLIENT_CITY_PROV_POSTAL}}", `${clientCity || ""}, ${clientProvince || ""}  ${clientPostal || ""}`],
+    ["{{CONTACT_NAME}}", contactName || ""],
+    ["{{CLIENT_EMAIL}}", clientEmail || ""],
+    ["{{BILLING_CYCLE}}", paymentType === "single" ? "One-time" : "Installments"],
+    ["{{SERVICE_START}}", fmtDate(serviceStartDate)],
+    ["{{INVOICE_NUMBER}}", "TBD — assigned upon close"],
+    ["{{OPTION_LABEL}}", getOptionLabel(optionNumber)],
+    ["{{MARKETS}}", Array.isArray(markets) ? markets.join(", ") : ""],
+    ["{{DELIVERABLES_TEXT}}", delivText],
+    ["{{OPTION_PRICE}}", formatCurrency(subtotal)],
+    ["{{OPTION_FEE}}", formatCurrency(subtotal)],
+    ["{{STORY_SERVICES}}", storyLabel],
+    ["{{STORY_SERVICES_TEXT}}", storyText],
+    ["{{STORY_RATE}}", formatCurrency(storyRateVal)],
+    ["{{STORY_QTY}}", String(storyQtyVal)],
+    ["{{STORY_FEE}}", formatCurrency(storyFee)],
+    ["{{SPECIAL_CONDITIONS}}", specialConditions?.trim() || "None"],
+    ["{{SUBTOTAL}}", formatCurrency(subtotal)],
+    ["{{TAX_LABEL}}", `${tax.name} (${(tax.rate * 100).toFixed(3).replace(/\.?0+$/, "")}%)`],
+    ["{{TAX_LINE}}", formatCurrency(taxAmount)],
+    ["{{TOTAL}}", formatCurrency(total)],
+    ["{{TOTAL_FOLLOWERS}}", `${new Intl.NumberFormat("en-CA").format(totalFollowers)} across ${accounts.length} accounts`],
+    ["{{CAMPAIGN_TERM}}", `${fmtDate(serviceStartDate)} — ${fmtDate(campaignEndDate)}`],
+    ["{{PAYMENT_1_NUM}}", "1"],
+    ["{{PAYMENT_1_AMOUNT}}", formatCurrency(payment1Amount)],
+    ["{{PAYMENT_1_TERMS}}", payment1Terms],
+  ];
+
   const updateRes = await fetch(
     `https://docs.googleapis.com/v1/documents/${docId}:batchUpdate`,
     {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${providerToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ requests: docRequests }),
+      method: "POST", headers: ah,
+      body: JSON.stringify({
+        requests: replacements.map(([find, replace]) => ({
+          replaceAllText: {
+            containsText: { text: find, matchCase: true },
+            replaceText: replace,
+          },
+        })),
+      }),
     }
   );
   if (!updateRes.ok) {
     const err = await updateRes.text();
-    console.error("Docs batchUpdate error:", err);
-    return NextResponse.json({ error: "Failed to write IO content", detail: err }, { status: 500 });
+    return NextResponse.json({ error: "Failed to fill template", detail: err }, { status: 500 });
   }
 
-  // 3. Move to Drive folder
-  await fetch(
-    `https://www.googleapis.com/drive/v3/files/${docId}?addParents=${DRIVE_FOLDER_ID}&removeParents=root`,
-    {
-      method: "PATCH",
-      headers: { Authorization: `Bearer ${providerToken}` },
+  // 4. Handle billing table rows dynamically
+  const docReadRes = await fetch(`https://docs.googleapis.com/v1/documents/${docId}`, {
+    headers: { Authorization: `Bearer ${providerToken}` },
+  });
+  const docData = await docReadRes.json();
+  const billingTable = findBillingTable(docData.body?.content ?? []);
+
+  if (billingTable?.tableRows) {
+    const allRows = billingTable.tableRows;
+    // allRows[0] = header, allRows[1] = payment 1 (filled above), allRows[2+] = empty template rows
+    const emptyRows = allRows.slice(2);
+    const additionalPayments = paymentType === "multiple" ? (paymentSchedule ?? []).slice(1) : [];
+    const tableStartIdx = billingTable.startIndex!;
+    const tableOps: unknown[] = [];
+
+    // Fill empty rows that have a corresponding additional payment
+    // Process from highest document index to lowest to avoid index shifting
+    for (let i = emptyRows.length - 1; i >= 0; i--) {
+      const payment = additionalPayments[i];
+      if (!payment) continue;
+
+      const amount = formatCurrency(Number(payment.amount) || 0);
+      const terms = payment.date ? `Due ${fmtDate(payment.date)}` : "TBD";
+      // Columns: Invoice # | Campaign Term | Total | Billing Cycle | Payment Terms
+      const cellValues = [String(i + 2), "", amount, "", terms];
+      const cells = emptyRows[i].tableCells ?? [];
+
+      for (let c = cells.length - 1; c >= 0; c--) {
+        if (!cellValues[c]) continue;
+        const cell = cells[c];
+        const insertIdx = (cell.content?.[0] as (GContent & { startIndex?: number }) | undefined)?.startIndex
+          ?? (cell.startIndex ?? 0) + 1;
+        tableOps.push({ insertText: { location: { index: insertIdx }, text: cellValues[c] } });
+      }
     }
-  );
+
+    // Delete unused empty rows (no corresponding payment), highest row index first
+    for (let i = emptyRows.length - 1; i >= 0; i--) {
+      if (i >= additionalPayments.length) {
+        tableOps.push({
+          deleteTableRow: {
+            tableCellLocation: {
+              tableStartLocation: { index: tableStartIdx },
+              rowIndex: allRows.indexOf(emptyRows[i]),
+              columnIndex: 0,
+            },
+          },
+        });
+      }
+    }
+
+    if (tableOps.length > 0) {
+      await fetch(
+        `https://docs.googleapis.com/v1/documents/${docId}:batchUpdate`,
+        { method: "POST", headers: ah, body: JSON.stringify({ requests: tableOps }) }
+      );
+    }
+  }
 
   const docUrl = `https://docs.google.com/document/d/${docId}/edit`;
   return NextResponse.json({ docId, docUrl, title: docTitle });

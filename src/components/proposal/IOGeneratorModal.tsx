@@ -85,17 +85,19 @@ export default function IOGeneratorModal({
   onClose,
 }: IOGeneratorModalProps) {
   const [optionNumber, setOptionNumber] = useState<number>(Math.min(optionsCount, 2));
+  const [contactName, setContactName] = useState("");
   const [clientLegalName, setClientLegalName] = useState("");
   const [clientStreet, setClientStreet] = useState("");
   const [clientCity, setClientCity] = useState("");
   const [clientProvince, setClientProvince] = useState("ON");
   const [clientPostal, setClientPostal] = useState("");
   const [clientEmail, setClientEmail] = useState("");
-  const [offerExpiry, setOfferExpiry] = useState("");
   const [serviceStartDate, setServiceStartDate] = useState("");
   const [campaignEndDate, setCampaignEndDate] = useState("");
   const [storyServicesType, setStoryServicesType] = useState<"complementary" | "full_price" | "other">("complementary");
   const [storyServicesNote, setStoryServicesNote] = useState("");
+  const [storyRate, setStoryRate] = useState("");
+  const [storyQty, setStoryQty] = useState("1");
   const [paymentType, setPaymentType] = useState<"single" | "multiple">("single");
   const [paymentCount, setPaymentCount] = useState(2);
   const [paymentSchedule, setPaymentSchedule] = useState<PaymentRow[]>([{ date: "", amount: "" }, { date: "", amount: "" }]);
@@ -151,17 +153,19 @@ export default function IOGeneratorModal({
         body: JSON.stringify({
           optionNumber,
           businessName,
+          contactName,
           clientLegalName: clientLegalName || businessName,
           clientStreet,
           clientCity,
           clientProvince,
           clientPostal,
           clientEmail,
-          offerExpiry,
           serviceStartDate,
           campaignEndDate,
           storyServicesType,
           storyServicesNote,
+          storyRate: storyRate ? parseFloat(storyRate.replace(/[^0-9.]/g, "")) : 0,
+          storyQty: parseInt(storyQty) || 1,
           paymentType,
           paymentSchedule,
           specialConditions,
@@ -258,6 +262,9 @@ export default function IOGeneratorModal({
               {/* Client billing */}
               <SectionHeader>Client Billing Details</SectionHeader>
               <div className="space-y-3">
+                <Field label="Invoice contact (first & last name)" required>
+                  <Input value={contactName} onChange={(e) => setContactName(e.target.value)} placeholder="Jane Smith" />
+                </Field>
                 <Field label="Legal company name">
                   <Input value={clientLegalName} onChange={(e) => setClientLegalName(e.target.value)} placeholder={businessName} />
                 </Field>
@@ -290,9 +297,6 @@ export default function IOGeneratorModal({
               {/* Dates */}
               <SectionHeader>Dates</SectionHeader>
               <div className="space-y-3">
-                <Field label="Offer expiry date">
-                  <Input type="date" value={offerExpiry} onChange={(e) => setOfferExpiry(e.target.value)} />
-                </Field>
                 <div className="grid grid-cols-2 gap-3">
                   <Field label="Service start date" required>
                     <Input type="date" value={serviceStartDate} onChange={(e) => setServiceStartDate(e.target.value)} />
@@ -316,15 +320,35 @@ export default function IOGeneratorModal({
                     </SelectContent>
                   </Select>
                 </Field>
+                {storyServicesType === "full_price" && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="Rate per story post">
+                      <Input value={storyRate} onChange={(e) => setStoryRate(e.target.value)} placeholder="$500.00" />
+                    </Field>
+                    <Field label="Quantity">
+                      <Input type="number" min="1" value={storyQty} onChange={(e) => setStoryQty(e.target.value)} placeholder="1" />
+                    </Field>
+                  </div>
+                )}
                 {storyServicesType === "other" && (
-                  <Field label="Describe the story arrangement">
-                    <Textarea
-                      value={storyServicesNote}
-                      onChange={(e) => setStoryServicesNote(e.target.value)}
-                      placeholder="e.g. 1 complimentary story on the main account, full price on supporting accounts…"
-                      rows={3}
-                    />
-                  </Field>
+                  <>
+                    <div className="grid grid-cols-2 gap-3">
+                      <Field label="Rate per story post">
+                        <Input value={storyRate} onChange={(e) => setStoryRate(e.target.value)} placeholder="$500.00" />
+                      </Field>
+                      <Field label="Quantity">
+                        <Input type="number" min="1" value={storyQty} onChange={(e) => setStoryQty(e.target.value)} placeholder="1" />
+                      </Field>
+                    </div>
+                    <Field label="Describe the story arrangement">
+                      <Textarea
+                        value={storyServicesNote}
+                        onChange={(e) => setStoryServicesNote(e.target.value)}
+                        placeholder="e.g. 1 complimentary story on the main account, full price on supporting accounts…"
+                        rows={3}
+                      />
+                    </Field>
+                  </>
                 )}
               </div>
 
@@ -347,7 +371,7 @@ export default function IOGeneratorModal({
                       <Select value={String(paymentCount)} onValueChange={(v) => setPaymentCount(Number(v))}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          {[2, 3, 4].map((n) => (
+                          {[2, 3, 4, 5, 6].map((n) => (
                             <SelectItem key={n} value={String(n)}>{n} payments</SelectItem>
                           ))}
                         </SelectContent>
