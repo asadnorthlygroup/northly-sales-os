@@ -1894,7 +1894,7 @@ function buildProposalData(
     ? "The opening window is short — every day without awareness is a missed opportunity to build momentum"
     : form.goals.some((g) => ["Bookings", "E-commerce Sales", "Sign Ups / Downloads"].includes(g))
     ? `Awareness alone is not enough — people need a clear reason to ${conversionVerb} now`
-    : "Once people discover ${client}, the product does the rest — our role is to increase that discovery";
+    : `Once people discover ${client}, the product does the rest — our role is to increase that discovery`;
 
   const recReasons: string[] = [];
   if (form.challenge) recReasons.push(form.challenge.trim().replace(/\.$/, ""));
