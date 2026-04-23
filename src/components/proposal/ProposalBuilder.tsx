@@ -71,6 +71,7 @@ interface ProposalForm {
   includeBA: boolean;
   includeLTO: boolean;
   includeOC: boolean;
+  includeGA: boolean;
   notes: string;
   selectedAccounts: Record<string, boolean>;
   customPrices: Record<string, number>;
@@ -107,6 +108,7 @@ const DEFAULT_FORM: ProposalForm = {
   includeBA: true,
   includeLTO: false,
   includeOC: false,
+  includeGA: false,
   notes: "",
   selectedAccounts: {},
   customPrices: {},
@@ -1064,7 +1066,7 @@ function Step2Strategy({
         <div>
           <Label className="text-sm font-medium">Campaign types to include</Label>
           <div className="flex gap-4 mt-2">
-            {([["includeBA", "BA (Brand Awareness)"], ["includeLTO", "LTO (Conversion)"], ["includeOC", "OC (Original Content)"]] as const).map(([key, label]) => (
+            {([["includeBA", "BA (Brand Awareness)"], ["includeLTO", "LTO (Conversion)"], ["includeOC", "OC (Original Content)"], ["includeGA", "GA (Giveaway)"]] as const).map(([key, label]) => (
               <label key={key} className="flex items-center gap-2 text-sm cursor-pointer">
                 <Checkbox
                   checked={form[key as keyof ProposalForm] as boolean}
@@ -1303,6 +1305,11 @@ function Step3Pages({
                               <div className={`text-xs ${selected ? "text-white/70" : "text-slate-400"}`}>
                                 per BA Feed Post + 2 Stories
                               </div>
+                              {form.includeGA && account.gaRate > 0 && (
+                                <div className={`text-xs mt-1 ${selected ? "text-white/60" : "text-slate-400"}`}>
+                                  Giveaway: {formatCurrency(roundProposalPrice(account.gaRate * (form.markupMode === "percentage" ? 1 + form.markupPercentage / 100 : 1)))}
+                                </div>
+                              )}
                               {form.includeOC && account.ocRate > 0 && (
                                 <div className={`text-xs mt-1 ${selected ? "text-white/60" : "text-slate-400"}`}>
                                   OC Reel: {formatCurrency(roundProposalPrice(account.ocRate * (form.markupMode === "percentage" ? 1 + form.markupPercentage / 100 : 1)))}

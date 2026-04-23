@@ -2,6 +2,7 @@
  * Account seed — sourced from V2 Rate Sheet (April 2026) and Audience Profile (March 2026).
  * baseRate = BA Feed Post (Dedicated) rate from the rate sheet.
  * storyRate = Story Post (1 Slide) rate.
+ * gaRate = GA (Giveaway) Feed Post rate.
  * ocRate = OC Reel Post rate.
  * talkingHeadRate = Talking Head Reel Post rate.
  */
@@ -40,9 +41,10 @@ export interface AccountSeed {
   region: string;
   followers: number;
   avgImpressions: number;
-  baseRate: number;       // BA Feed Post (Dedicated)
-  storyRate: number;      // Story Post (1 Slide)
-  ocRate: number;         // OC Reel Post
+  baseRate: number;        // BA Feed Post (Dedicated)
+  storyRate: number;       // Story Post (1 Slide)
+  gaRate: number;          // GA (Giveaway) Feed Post
+  ocRate: number;          // OC Reel Post
   talkingHeadRate: number; // Talking Head Reel Post
   categories: BusinessCategory[];
   pricingStatus: PricingStatus;
@@ -69,95 +71,95 @@ const RAW: Array<{
   handle: string; subNetwork: SubNetwork; platform: Platform;
   market: string; marketLabel: string; region: string;
   followers: number;
-  baseRate: number; storyRate: number; ocRate: number; talkingHeadRate: number;
+  baseRate: number; storyRate: number; gaRate: number; ocRate: number; talkingHeadRate: number;
   categories: BusinessCategory[]; pricingStatus?: PricingStatus;
 }> = [
   // ─── NATIONAL ────────────────────────────────────────────────────────────
-  { handle: "@waverooom",     subNetwork: "waveroom", platform: "instagram", market: "national", marketLabel: "National", region: "Canada", followers: 603000, baseRate: 1497, storyRate: 749, ocRate: 2497, talkingHeadRate: 1897, categories: ALL_CATS },
-  { handle: "@northlycanada", subNetwork: "northly",  platform: "instagram", market: "national", marketLabel: "National", region: "Canada", followers: 207000, baseRate:  829, storyRate: 415, ocRate: 1829, talkingHeadRate: 1229, categories: ALL_CATS },
-  { handle: "@mustbecanada",  subNetwork: "must_be",  platform: "instagram", market: "national", marketLabel: "National", region: "Canada", followers:  77300, baseRate:  399, storyRate: 199, ocRate: 1399, talkingHeadRate:  799, categories: RETAIL_CATS },
-  { handle: "@canadagotdeals",subNetwork: "got_deals",platform: "instagram", market: "national", marketLabel: "National", region: "Canada", followers:  48200, baseRate:  346, storyRate: 173, ocRate: 1346, talkingHeadRate:  746, categories: RETAIL_CATS },
-  { handle: "@northlyfoodie", subNetwork: "northly",  platform: "instagram", market: "national", marketLabel: "National", region: "Canada", followers:  40200, baseRate:  210, storyRate: 105, ocRate: 1210, talkingHeadRate:  610, categories: FOOD_CATS },
-  { handle: "@northlysports", subNetwork: "northly",  platform: "instagram", market: "national", marketLabel: "National", region: "Canada", followers:   9664, baseRate:  149, storyRate:  74, ocRate: 1149, talkingHeadRate:  549, categories: ["retail", "event_space", "service"] },
-  { handle: "@northlyamerica",subNetwork: "northly",  platform: "instagram", market: "national", marketLabel: "National", region: "Canada", followers:  76000, baseRate:  604, storyRate: 302, ocRate: 1604, talkingHeadRate: 1004, categories: ALL_CATS },
+  { handle: "@waverooom",     subNetwork: "waveroom", platform: "instagram", market: "national", marketLabel: "National", region: "Canada", followers: 603000, baseRate: 1497, storyRate: 749, gaRate: 1796, ocRate: 2497, talkingHeadRate: 1897, categories: ALL_CATS },
+  { handle: "@northlycanada", subNetwork: "northly",  platform: "instagram", market: "national", marketLabel: "National", region: "Canada", followers: 207000, baseRate:  829, storyRate: 415, gaRate:  995, ocRate: 1829, talkingHeadRate: 1229, categories: ALL_CATS },
+  { handle: "@mustbecanada",  subNetwork: "must_be",  platform: "instagram", market: "national", marketLabel: "National", region: "Canada", followers:  77300, baseRate:  399, storyRate: 199, gaRate:  478, ocRate: 1399, talkingHeadRate:  799, categories: RETAIL_CATS },
+  { handle: "@canadagotdeals",subNetwork: "got_deals",platform: "instagram", market: "national", marketLabel: "National", region: "Canada", followers:  48200, baseRate:  346, storyRate: 173, gaRate:  416, ocRate: 1346, talkingHeadRate:  746, categories: RETAIL_CATS },
+  { handle: "@northlyfoodie", subNetwork: "northly",  platform: "instagram", market: "national", marketLabel: "National", region: "Canada", followers:  40200, baseRate:  210, storyRate: 105, gaRate:  252, ocRate: 1210, talkingHeadRate:  610, categories: FOOD_CATS },
+  { handle: "@northlysports", subNetwork: "northly",  platform: "instagram", market: "national", marketLabel: "National", region: "Canada", followers:   9664, baseRate:  149, storyRate:  74, gaRate:  178, ocRate: 1149, talkingHeadRate:  549, categories: ["retail", "event_space", "service"] },
+  { handle: "@northlyamerica",subNetwork: "northly",  platform: "instagram", market: "national", marketLabel: "National", region: "Canada", followers:  76000, baseRate:  604, storyRate: 302, gaRate:  725, ocRate: 1604, talkingHeadRate: 1004, categories: ALL_CATS },
 
   // ─── TORONTO ─────────────────────────────────────────────────────────────
-  { handle: "@waveroom.toronto",    subNetwork: "waveroom",       platform: "instagram", market: "toronto", marketLabel: "Toronto", region: "Ontario", followers: 264000, baseRate:  730, storyRate: 365, ocRate: 1730, talkingHeadRate: 1130, categories: ALL_CATS },
-  { handle: "@northlytoronto",      subNetwork: "northly",        platform: "instagram", market: "toronto", marketLabel: "Toronto", region: "Ontario", followers: 169000, baseRate:  682, storyRate: 341, ocRate: 1682, talkingHeadRate: 1082, categories: ALL_CATS },
-  { handle: "@girlplanstoronto",    subNetwork: "whats_the_plan", platform: "instagram", market: "toronto", marketLabel: "Toronto", region: "Ontario", followers:  67300, baseRate:  620, storyRate: 310, ocRate: 1620, talkingHeadRate: 1020, categories: LIFESTYLE_CATS },
-  { handle: "@mustbetoronto",       subNetwork: "must_be",        platform: "instagram", market: "toronto", marketLabel: "Toronto", region: "Ontario", followers:  90000, baseRate:  475, storyRate: 237, ocRate: 1475, talkingHeadRate:  875, categories: FOOD_CATS },
-  { handle: "@nightouttoronto",     subNetwork: "nightout",       platform: "instagram", market: "toronto", marketLabel: "Toronto", region: "Ontario", followers: 131000, baseRate:  366, storyRate: 183, ocRate: 1366, talkingHeadRate:  766, categories: BAR_CATS },
-  { handle: "@bites.toronto",       subNetwork: "bites",          platform: "instagram", market: "toronto", marketLabel: "Toronto", region: "Ontario", followers:  73600, baseRate:  393, storyRate: 196, ocRate: 1393, talkingHeadRate:  793, categories: FOOD_CATS },
-  { handle: "@torontosight",        subNetwork: "extra_assets",   platform: "instagram", market: "toronto", marketLabel: "Toronto", region: "Ontario", followers:  56200, baseRate:  367, storyRate: 183, ocRate: 1367, talkingHeadRate:  767, categories: ["event_space", "retail", "service"] },
-  { handle: "@torontoclip",         subNetwork: "extra_assets",   platform: "instagram", market: "toronto", marketLabel: "Toronto", region: "Ontario", followers:  56200, baseRate:  367, storyRate: 183, ocRate: 1367, talkingHeadRate:  767, categories: ["event_space", "retail", "service"] },
-  { handle: "@torontogotdeals",     subNetwork: "got_deals",      platform: "instagram", market: "toronto", marketLabel: "Toronto", region: "Ontario", followers:  24000, baseRate:  259, storyRate: 130, ocRate: 1259, talkingHeadRate:  659, categories: RETAIL_CATS },
-  { handle: "@torontohousingwatch", subNetwork: "housing_watch",  platform: "instagram", market: "toronto", marketLabel: "Toronto", region: "Ontario", followers:  33000, baseRate:  278, storyRate: 139, ocRate: 1278, talkingHeadRate:  678, categories: ["service", "retail", "ecommerce"] },
-  { handle: "@ontariohousingwatch", subNetwork: "housing_watch",  platform: "instagram", market: "toronto", marketLabel: "Toronto", region: "Ontario", followers:  13900, baseRate:  100, storyRate:  50, ocRate: 1100, talkingHeadRate:  500, categories: ["service", "retail"] },
+  { handle: "@waveroom.toronto",    subNetwork: "waveroom",       platform: "instagram", market: "toronto", marketLabel: "Toronto", region: "Ontario", followers: 264000, baseRate:  730, storyRate: 365, gaRate:  876, ocRate: 1730, talkingHeadRate: 1130, categories: ALL_CATS },
+  { handle: "@northlytoronto",      subNetwork: "northly",        platform: "instagram", market: "toronto", marketLabel: "Toronto", region: "Ontario", followers: 169000, baseRate:  682, storyRate: 341, gaRate:  819, ocRate: 1682, talkingHeadRate: 1082, categories: ALL_CATS },
+  { handle: "@girlplanstoronto",    subNetwork: "whats_the_plan", platform: "instagram", market: "toronto", marketLabel: "Toronto", region: "Ontario", followers:  67300, baseRate:  620, storyRate: 310, gaRate:  745, ocRate: 1620, talkingHeadRate: 1020, categories: LIFESTYLE_CATS },
+  { handle: "@mustbetoronto",       subNetwork: "must_be",        platform: "instagram", market: "toronto", marketLabel: "Toronto", region: "Ontario", followers:  90000, baseRate:  475, storyRate: 237, gaRate:  570, ocRate: 1475, talkingHeadRate:  875, categories: FOOD_CATS },
+  { handle: "@nightouttoronto",     subNetwork: "nightout",       platform: "instagram", market: "toronto", marketLabel: "Toronto", region: "Ontario", followers: 131000, baseRate:  366, storyRate: 183, gaRate:  439, ocRate: 1366, talkingHeadRate:  766, categories: BAR_CATS },
+  { handle: "@bites.toronto",       subNetwork: "bites",          platform: "instagram", market: "toronto", marketLabel: "Toronto", region: "Ontario", followers:  73600, baseRate:  393, storyRate: 196, gaRate:  472, ocRate: 1393, talkingHeadRate:  793, categories: FOOD_CATS },
+  { handle: "@torontosight",        subNetwork: "extra_assets",   platform: "instagram", market: "toronto", marketLabel: "Toronto", region: "Ontario", followers:  56200, baseRate:  367, storyRate: 183, gaRate:  440, ocRate: 1367, talkingHeadRate:  767, categories: ["event_space", "retail", "service"] },
+  { handle: "@torontoclip",         subNetwork: "extra_assets",   platform: "instagram", market: "toronto", marketLabel: "Toronto", region: "Ontario", followers:  56200, baseRate:  367, storyRate: 183, gaRate:  440, ocRate: 1367, talkingHeadRate:  767, categories: ["event_space", "retail", "service"] },
+  { handle: "@torontogotdeals",     subNetwork: "got_deals",      platform: "instagram", market: "toronto", marketLabel: "Toronto", region: "Ontario", followers:  24000, baseRate:  259, storyRate: 130, gaRate:  311, ocRate: 1259, talkingHeadRate:  659, categories: RETAIL_CATS },
+  { handle: "@torontohousingwatch", subNetwork: "housing_watch",  platform: "instagram", market: "toronto", marketLabel: "Toronto", region: "Ontario", followers:  33000, baseRate:  278, storyRate: 139, gaRate:  334, ocRate: 1278, talkingHeadRate:  678, categories: ["service", "retail", "ecommerce"] },
+  { handle: "@ontariohousingwatch", subNetwork: "housing_watch",  platform: "instagram", market: "toronto", marketLabel: "Toronto", region: "Ontario", followers:  13900, baseRate:  100, storyRate:  50, gaRate:  120, ocRate: 1100, talkingHeadRate:  500, categories: ["service", "retail"] },
 
   // ─── GTA ─────────────────────────────────────────────────────────────────
-  { handle: "@northlybrampton",   subNetwork: "northly",  platform: "instagram", market: "brampton",    marketLabel: "Brampton",    region: "Ontario", followers: 79500, baseRate: 465, storyRate: 232, ocRate: 1465, talkingHeadRate:  865, categories: ALL_CATS },
-  { handle: "@waveroombrampton",  subNetwork: "waveroom", platform: "instagram", market: "brampton",    marketLabel: "Brampton",    region: "Ontario", followers: 24700, baseRate: 354, storyRate: 177, ocRate: 1354, talkingHeadRate:  754, categories: FOOD_CATS },
-  { handle: "@northlymississauga",subNetwork: "northly",  platform: "instagram", market: "mississauga", marketLabel: "Mississauga", region: "Ontario", followers: 16200, baseRate: 260, storyRate: 130, ocRate: 1260, talkingHeadRate:  660, categories: ALL_CATS },
-  { handle: "@waveroommississauga",subNetwork: "waveroom",platform: "instagram", market: "mississauga", marketLabel: "Mississauga", region: "Ontario", followers: 27900, baseRate: 299, storyRate: 150, ocRate: 1299, talkingHeadRate:  699, categories: FOOD_CATS },
-  { handle: "@northlydurham",     subNetwork: "northly",  platform: "instagram", market: "durham",      marketLabel: "Durham",      region: "Ontario", followers: 56900, baseRate: 505, storyRate: 252, ocRate: 1505, talkingHeadRate:  905, categories: ALL_CATS },
-  { handle: "@northlyyorkregion", subNetwork: "northly",  platform: "instagram", market: "york_region", marketLabel: "York Region", region: "Ontario", followers:  9760, baseRate: 188, storyRate:  94, ocRate: 1188, talkingHeadRate:  588, categories: ALL_CATS },
+  { handle: "@northlybrampton",   subNetwork: "northly",  platform: "instagram", market: "brampton",    marketLabel: "Brampton",    region: "Ontario", followers: 79500, baseRate: 465, storyRate: 232, gaRate: 558, ocRate: 1465, talkingHeadRate:  865, categories: ALL_CATS },
+  { handle: "@waveroombrampton",  subNetwork: "waveroom", platform: "instagram", market: "brampton",    marketLabel: "Brampton",    region: "Ontario", followers: 24700, baseRate: 354, storyRate: 177, gaRate: 424, ocRate: 1354, talkingHeadRate:  754, categories: FOOD_CATS },
+  { handle: "@northlymississauga",subNetwork: "northly",  platform: "instagram", market: "mississauga", marketLabel: "Mississauga", region: "Ontario", followers: 16200, baseRate: 260, storyRate: 130, gaRate: 312, ocRate: 1260, talkingHeadRate:  660, categories: ALL_CATS },
+  { handle: "@waveroommississauga",subNetwork: "waveroom",platform: "instagram", market: "mississauga", marketLabel: "Mississauga", region: "Ontario", followers: 27900, baseRate: 299, storyRate: 150, gaRate: 359, ocRate: 1299, talkingHeadRate:  699, categories: FOOD_CATS },
+  { handle: "@northlydurham",     subNetwork: "northly",  platform: "instagram", market: "durham",      marketLabel: "Durham",      region: "Ontario", followers: 56900, baseRate: 505, storyRate: 252, gaRate: 606, ocRate: 1505, talkingHeadRate:  905, categories: ALL_CATS },
+  { handle: "@northlyyorkregion", subNetwork: "northly",  platform: "instagram", market: "york_region", marketLabel: "York Region", region: "Ontario", followers:  9760, baseRate: 188, storyRate:  94, gaRate: 226, ocRate: 1188, talkingHeadRate:  588, categories: ALL_CATS },
 
   // ─── HAMILTON ────────────────────────────────────────────────────────────
-  { handle: "@northlyhamilton",     subNetwork: "northly",        platform: "instagram", market: "hamilton", marketLabel: "Hamilton", region: "Ontario", followers: 144000, baseRate: 671, storyRate: 336, ocRate: 1671, talkingHeadRate: 1071, categories: ALL_CATS },
-  { handle: "@girlplanshamilton",   subNetwork: "whats_the_plan", platform: "instagram", market: "hamilton", marketLabel: "Hamilton", region: "Ontario", followers:  28600, baseRate: 486, storyRate: 243, ocRate: 1486, talkingHeadRate:  886, categories: LIFESTYLE_CATS },
-  { handle: "@waveroomhamilton",    subNetwork: "waveroom",       platform: "instagram", market: "hamilton", marketLabel: "Hamilton", region: "Ontario", followers:   4949, baseRate: 148, storyRate:  74, ocRate: 1148, talkingHeadRate:  548, categories: FOOD_CATS },
-  { handle: "@mustbehamilton",      subNetwork: "must_be",        platform: "instagram", market: "hamilton", marketLabel: "Hamilton", region: "Ontario", followers:   4963, baseRate: 160, storyRate:  80, ocRate: 1160, talkingHeadRate:  560, categories: FOOD_CATS },
+  { handle: "@northlyhamilton",     subNetwork: "northly",        platform: "instagram", market: "hamilton", marketLabel: "Hamilton", region: "Ontario", followers: 144000, baseRate: 671, storyRate: 336, gaRate: 806, ocRate: 1671, talkingHeadRate: 1071, categories: ALL_CATS },
+  { handle: "@girlplanshamilton",   subNetwork: "whats_the_plan", platform: "instagram", market: "hamilton", marketLabel: "Hamilton", region: "Ontario", followers:  28600, baseRate: 486, storyRate: 243, gaRate: 584, ocRate: 1486, talkingHeadRate:  886, categories: LIFESTYLE_CATS },
+  { handle: "@waveroomhamilton",    subNetwork: "waveroom",       platform: "instagram", market: "hamilton", marketLabel: "Hamilton", region: "Ontario", followers:   4949, baseRate: 148, storyRate:  74, gaRate: 177, ocRate: 1148, talkingHeadRate:  548, categories: FOOD_CATS },
+  { handle: "@mustbehamilton",      subNetwork: "must_be",        platform: "instagram", market: "hamilton", marketLabel: "Hamilton", region: "Ontario", followers:   4963, baseRate: 160, storyRate:  80, gaRate: 193, ocRate: 1160, talkingHeadRate:  560, categories: FOOD_CATS },
 
   // ─── OTTAWA ──────────────────────────────────────────────────────────────
-  { handle: "@northlyottawa",       subNetwork: "northly",        platform: "instagram", market: "ottawa", marketLabel: "Ottawa", region: "Ontario", followers: 78900, baseRate: 436, storyRate: 218, ocRate: 1436, talkingHeadRate:  836, categories: ALL_CATS },
-  { handle: "@whatstheplanottawa",  subNetwork: "whats_the_plan", platform: "instagram", market: "ottawa", marketLabel: "Ottawa", region: "Ontario", followers: 35000, baseRate: 516, storyRate: 258, ocRate: 1516, talkingHeadRate:  916, categories: LIFESTYLE_CATS },
-  { handle: "@waveroomottawa",      subNetwork: "waveroom",       platform: "instagram", market: "ottawa", marketLabel: "Ottawa", region: "Ontario", followers:  6450, baseRate: 100, storyRate:  50, ocRate: 1100, talkingHeadRate:  500, categories: FOOD_CATS },
+  { handle: "@northlyottawa",       subNetwork: "northly",        platform: "instagram", market: "ottawa", marketLabel: "Ottawa", region: "Ontario", followers: 78900, baseRate: 436, storyRate: 218, gaRate: 523, ocRate: 1436, talkingHeadRate:  836, categories: ALL_CATS },
+  { handle: "@whatstheplanottawa",  subNetwork: "whats_the_plan", platform: "instagram", market: "ottawa", marketLabel: "Ottawa", region: "Ontario", followers: 35000, baseRate: 516, storyRate: 258, gaRate: 619, ocRate: 1516, talkingHeadRate:  916, categories: LIFESTYLE_CATS },
+  { handle: "@waveroomottawa",      subNetwork: "waveroom",       platform: "instagram", market: "ottawa", marketLabel: "Ottawa", region: "Ontario", followers:  6450, baseRate: 100, storyRate:  50, gaRate: 120, ocRate: 1100, talkingHeadRate:  500, categories: FOOD_CATS },
 
   // ─── KITCHENER / WATERLOO ────────────────────────────────────────────────
-  { handle: "@northlykitchener", subNetwork: "northly", platform: "instagram", market: "kitchener", marketLabel: "Kitchener", region: "Ontario", followers: 33600, baseRate: 300, storyRate: 150, ocRate: 1300, talkingHeadRate: 700, categories: ALL_CATS },
+  { handle: "@northlykitchener", subNetwork: "northly", platform: "instagram", market: "kitchener", marketLabel: "Kitchener", region: "Ontario", followers: 33600, baseRate: 300, storyRate: 150, gaRate: 360, ocRate: 1300, talkingHeadRate: 700, categories: ALL_CATS },
 
   // ─── LONDON ──────────────────────────────────────────────────────────────
-  { handle: "@northlylondon", subNetwork: "northly", platform: "instagram", market: "london", marketLabel: "London ON", region: "Ontario", followers: 29400, baseRate: 303, storyRate: 151, ocRate: 1303, talkingHeadRate: 703, categories: ALL_CATS },
+  { handle: "@northlylondon", subNetwork: "northly", platform: "instagram", market: "london", marketLabel: "London ON", region: "Ontario", followers: 29400, baseRate: 303, storyRate: 151, gaRate: 364, ocRate: 1303, talkingHeadRate: 703, categories: ALL_CATS },
 
   // ─── WINDSOR ─────────────────────────────────────────────────────────────
-  { handle: "@northlywindsor", subNetwork: "northly", platform: "instagram", market: "windsor", marketLabel: "Windsor", region: "Ontario", followers: 26000, baseRate: 240, storyRate: 120, ocRate: 1240, talkingHeadRate: 640, categories: ALL_CATS },
+  { handle: "@northlywindsor", subNetwork: "northly", platform: "instagram", market: "windsor", marketLabel: "Windsor", region: "Ontario", followers: 26000, baseRate: 240, storyRate: 120, gaRate: 288, ocRate: 1240, talkingHeadRate: 640, categories: ALL_CATS },
 
   // ─── MONTREAL ────────────────────────────────────────────────────────────
-  { handle: "@waveroommontreal",    subNetwork: "waveroom",       platform: "instagram", market: "montreal", marketLabel: "Montreal", region: "Quebec", followers: 85100, baseRate: 416, storyRate: 208, ocRate: 1416, talkingHeadRate:  816, categories: ALL_CATS },
-  { handle: "@northlymontreal",     subNetwork: "northly",        platform: "instagram", market: "montreal", marketLabel: "Montreal", region: "Quebec", followers: 63300, baseRate: 369, storyRate: 185, ocRate: 1369, talkingHeadRate:  769, categories: ALL_CATS },
-  { handle: "@girlplansmontreal",   subNetwork: "whats_the_plan", platform: "instagram", market: "montreal", marketLabel: "Montreal", region: "Quebec", followers: 32600, baseRate: 445, storyRate: 223, ocRate: 1445, talkingHeadRate:  845, categories: LIFESTYLE_CATS },
-  { handle: "@montrealhousingwatch",subNetwork: "housing_watch",  platform: "instagram", market: "montreal", marketLabel: "Montreal", region: "Quebec", followers:  3900, baseRate: 100, storyRate:  50, ocRate: 1100, talkingHeadRate:  500, categories: ["service", "retail"] },
+  { handle: "@waveroommontreal",    subNetwork: "waveroom",       platform: "instagram", market: "montreal", marketLabel: "Montreal", region: "Quebec", followers: 85100, baseRate: 416, storyRate: 208, gaRate: 499, ocRate: 1416, talkingHeadRate:  816, categories: ALL_CATS },
+  { handle: "@northlymontreal",     subNetwork: "northly",        platform: "instagram", market: "montreal", marketLabel: "Montreal", region: "Quebec", followers: 63300, baseRate: 369, storyRate: 185, gaRate: 443, ocRate: 1369, talkingHeadRate:  769, categories: ALL_CATS },
+  { handle: "@girlplansmontreal",   subNetwork: "whats_the_plan", platform: "instagram", market: "montreal", marketLabel: "Montreal", region: "Quebec", followers: 32600, baseRate: 445, storyRate: 223, gaRate: 534, ocRate: 1445, talkingHeadRate:  845, categories: LIFESTYLE_CATS },
+  { handle: "@montrealhousingwatch",subNetwork: "housing_watch",  platform: "instagram", market: "montreal", marketLabel: "Montreal", region: "Quebec", followers:  3900, baseRate: 100, storyRate:  50, gaRate: 120, ocRate: 1100, talkingHeadRate:  500, categories: ["service", "retail"] },
 
   // ─── VANCOUVER ───────────────────────────────────────────────────────────
-  { handle: "@waveroomvancouver",  subNetwork: "waveroom",       platform: "instagram", market: "vancouver", marketLabel: "Vancouver", region: "BC", followers: 91300, baseRate: 472, storyRate: 236, ocRate: 1472, talkingHeadRate:  872, categories: ALL_CATS },
-  { handle: "@northlyvancouver",   subNetwork: "northly",        platform: "instagram", market: "vancouver", marketLabel: "Vancouver", region: "BC", followers: 87200, baseRate: 489, storyRate: 244, ocRate: 1489, talkingHeadRate:  889, categories: ALL_CATS },
-  { handle: "@girlplansvancouver", subNetwork: "whats_the_plan", platform: "instagram", market: "vancouver", marketLabel: "Vancouver", region: "BC", followers: 37100, baseRate: 529, storyRate: 264, ocRate: 1529, talkingHeadRate:  929, categories: LIFESTYLE_CATS },
-  { handle: "@nightoutvancouver",  subNetwork: "nightout",       platform: "instagram", market: "vancouver", marketLabel: "Vancouver", region: "BC", followers: 13400, baseRate: 158, storyRate:  79, ocRate: 1158, talkingHeadRate:  558, categories: BAR_CATS },
-  { handle: "@mustbevan",          subNetwork: "must_be",        platform: "instagram", market: "vancouver", marketLabel: "Vancouver", region: "BC", followers:  7737, baseRate: 172, storyRate:  86, ocRate: 1172, talkingHeadRate:  572, categories: FOOD_CATS },
-  { handle: "@bitesvancouver",     subNetwork: "bites",          platform: "instagram", market: "vancouver", marketLabel: "Vancouver", region: "BC", followers: 13600, baseRate: 166, storyRate:  83, ocRate: 1166, talkingHeadRate:  566, categories: FOOD_CATS },
+  { handle: "@waveroomvancouver",  subNetwork: "waveroom",       platform: "instagram", market: "vancouver", marketLabel: "Vancouver", region: "BC", followers: 91300, baseRate: 472, storyRate: 236, gaRate: 567, ocRate: 1472, talkingHeadRate:  872, categories: ALL_CATS },
+  { handle: "@northlyvancouver",   subNetwork: "northly",        platform: "instagram", market: "vancouver", marketLabel: "Vancouver", region: "BC", followers: 87200, baseRate: 489, storyRate: 244, gaRate: 587, ocRate: 1489, talkingHeadRate:  889, categories: ALL_CATS },
+  { handle: "@girlplansvancouver", subNetwork: "whats_the_plan", platform: "instagram", market: "vancouver", marketLabel: "Vancouver", region: "BC", followers: 37100, baseRate: 529, storyRate: 264, gaRate: 634, ocRate: 1529, talkingHeadRate:  929, categories: LIFESTYLE_CATS },
+  { handle: "@nightoutvancouver",  subNetwork: "nightout",       platform: "instagram", market: "vancouver", marketLabel: "Vancouver", region: "BC", followers: 13400, baseRate: 158, storyRate:  79, gaRate: 189, ocRate: 1158, talkingHeadRate:  558, categories: BAR_CATS },
+  { handle: "@mustbevan",          subNetwork: "must_be",        platform: "instagram", market: "vancouver", marketLabel: "Vancouver", region: "BC", followers:  7737, baseRate: 172, storyRate:  86, gaRate: 206, ocRate: 1172, talkingHeadRate:  572, categories: FOOD_CATS },
+  { handle: "@bitesvancouver",     subNetwork: "bites",          platform: "instagram", market: "vancouver", marketLabel: "Vancouver", region: "BC", followers: 13600, baseRate: 166, storyRate:  83, gaRate: 199, ocRate: 1166, talkingHeadRate:  566, categories: FOOD_CATS },
 
   // ─── CALGARY ─────────────────────────────────────────────────────────────
-  { handle: "@northlycalgary",      subNetwork: "northly",        platform: "instagram", market: "calgary", marketLabel: "Calgary", region: "Alberta", followers: 54300, baseRate: 331, storyRate: 166, ocRate: 1331, talkingHeadRate: 731, categories: ALL_CATS },
-  { handle: "@whatstheplancalgary", subNetwork: "whats_the_plan", platform: "instagram", market: "calgary", marketLabel: "Calgary", region: "Alberta", followers: 19200, baseRate: 327, storyRate: 163, ocRate: 1327, talkingHeadRate: 727, categories: LIFESTYLE_CATS },
-  { handle: "@waveroomcalgary",     subNetwork: "waveroom",       platform: "instagram", market: "calgary", marketLabel: "Calgary", region: "Alberta", followers:  9967, baseRate: 169, storyRate:  84, ocRate: 1169, talkingHeadRate: 569, categories: FOOD_CATS },
-  { handle: "@mustbecalgary",       subNetwork: "must_be",        platform: "instagram", market: "calgary", marketLabel: "Calgary", region: "Alberta", followers: 18000, baseRate: 237, storyRate: 119, ocRate: 1237, talkingHeadRate: 637, categories: FOOD_CATS },
-  { handle: "@bites.calgary",       subNetwork: "bites",          platform: "instagram", market: "calgary", marketLabel: "Calgary", region: "Alberta", followers: 10000, baseRate: 100, storyRate:  50, ocRate: 1100, talkingHeadRate: 500, categories: FOOD_CATS },
+  { handle: "@northlycalgary",      subNetwork: "northly",        platform: "instagram", market: "calgary", marketLabel: "Calgary", region: "Alberta", followers: 54300, baseRate: 331, storyRate: 166, gaRate: 397, ocRate: 1331, talkingHeadRate: 731, categories: ALL_CATS },
+  { handle: "@whatstheplancalgary", subNetwork: "whats_the_plan", platform: "instagram", market: "calgary", marketLabel: "Calgary", region: "Alberta", followers: 19200, baseRate: 327, storyRate: 163, gaRate: 392, ocRate: 1327, talkingHeadRate: 727, categories: LIFESTYLE_CATS },
+  { handle: "@waveroomcalgary",     subNetwork: "waveroom",       platform: "instagram", market: "calgary", marketLabel: "Calgary", region: "Alberta", followers:  9967, baseRate: 169, storyRate:  84, gaRate: 203, ocRate: 1169, talkingHeadRate: 569, categories: FOOD_CATS },
+  { handle: "@mustbecalgary",       subNetwork: "must_be",        platform: "instagram", market: "calgary", marketLabel: "Calgary", region: "Alberta", followers: 18000, baseRate: 237, storyRate: 119, gaRate: 284, ocRate: 1237, talkingHeadRate: 637, categories: FOOD_CATS },
+  { handle: "@bites.calgary",       subNetwork: "bites",          platform: "instagram", market: "calgary", marketLabel: "Calgary", region: "Alberta", followers: 10000, baseRate: 100, storyRate:  50, gaRate: 120, ocRate: 1100, talkingHeadRate: 500, categories: FOOD_CATS },
 
   // ─── EDMONTON ────────────────────────────────────────────────────────────
-  { handle: "@northlyedmonton",  subNetwork: "northly",  platform: "instagram", market: "edmonton", marketLabel: "Edmonton", region: "Alberta", followers: 64700, baseRate: 430, storyRate: 215, ocRate: 1430, talkingHeadRate: 830, categories: ALL_CATS },
-  { handle: "@mustbeedmonton",   subNetwork: "must_be",  platform: "instagram", market: "edmonton", marketLabel: "Edmonton", region: "Alberta", followers:  7241, baseRate: 169, storyRate:  85, ocRate: 1169, talkingHeadRate: 569, categories: FOOD_CATS },
-  { handle: "@edmontongotdeals", subNetwork: "got_deals",platform: "instagram", market: "edmonton", marketLabel: "Edmonton", region: "Alberta", followers: 12300, baseRate: 122, storyRate:  61, ocRate: 1122, talkingHeadRate: 522, categories: RETAIL_CATS },
-  { handle: "@waveroomedmonton", subNetwork: "waveroom", platform: "instagram", market: "edmonton", marketLabel: "Edmonton", region: "Alberta", followers: 17300, baseRate: 219, storyRate: 109, ocRate: 1219, talkingHeadRate: 619, categories: FOOD_CATS },
+  { handle: "@northlyedmonton",  subNetwork: "northly",  platform: "instagram", market: "edmonton", marketLabel: "Edmonton", region: "Alberta", followers: 64700, baseRate: 430, storyRate: 215, gaRate: 516, ocRate: 1430, talkingHeadRate: 830, categories: ALL_CATS },
+  { handle: "@mustbeedmonton",   subNetwork: "must_be",  platform: "instagram", market: "edmonton", marketLabel: "Edmonton", region: "Alberta", followers:  7241, baseRate: 169, storyRate:  85, gaRate: 203, ocRate: 1169, talkingHeadRate: 569, categories: FOOD_CATS },
+  { handle: "@edmontongotdeals", subNetwork: "got_deals",platform: "instagram", market: "edmonton", marketLabel: "Edmonton", region: "Alberta", followers: 12300, baseRate: 122, storyRate:  61, gaRate: 146, ocRate: 1122, talkingHeadRate: 522, categories: RETAIL_CATS },
+  { handle: "@waveroomedmonton", subNetwork: "waveroom", platform: "instagram", market: "edmonton", marketLabel: "Edmonton", region: "Alberta", followers: 17300, baseRate: 219, storyRate: 109, gaRate: 262, ocRate: 1219, talkingHeadRate: 619, categories: FOOD_CATS },
 
   // ─── WINNIPEG ────────────────────────────────────────────────────────────
-  { handle: "@northlywinnipeg",  subNetwork: "northly",  platform: "instagram", market: "winnipeg", marketLabel: "Winnipeg", region: "Manitoba", followers: 55300, baseRate: 364, storyRate: 182, ocRate: 1364, talkingHeadRate: 764, categories: ALL_CATS },
-  { handle: "@waveroomwinnipeg", subNetwork: "waveroom", platform: "instagram", market: "winnipeg", marketLabel: "Winnipeg", region: "Manitoba", followers:   690, baseRate: 100, storyRate:  50, ocRate: 1100, talkingHeadRate: 500, categories: FOOD_CATS },
+  { handle: "@northlywinnipeg",  subNetwork: "northly",  platform: "instagram", market: "winnipeg", marketLabel: "Winnipeg", region: "Manitoba", followers: 55300, baseRate: 364, storyRate: 182, gaRate: 436, ocRate: 1364, talkingHeadRate: 764, categories: ALL_CATS },
+  { handle: "@waveroomwinnipeg", subNetwork: "waveroom", platform: "instagram", market: "winnipeg", marketLabel: "Winnipeg", region: "Manitoba", followers:   690, baseRate: 100, storyRate:  50, gaRate: 120, ocRate: 1100, talkingHeadRate: 500, categories: FOOD_CATS },
 
   // ─── SASKATOON ───────────────────────────────────────────────────────────
-  { handle: "@northlysaskatoon", subNetwork: "northly", platform: "instagram", market: "saskatoon", marketLabel: "Saskatoon", region: "Saskatchewan", followers: 49200, baseRate: 312, storyRate: 156, ocRate: 1312, talkingHeadRate: 712, categories: ALL_CATS },
+  { handle: "@northlysaskatoon", subNetwork: "northly", platform: "instagram", market: "saskatoon", marketLabel: "Saskatoon", region: "Saskatchewan", followers: 49200, baseRate: 312, storyRate: 156, gaRate: 375, ocRate: 1312, talkingHeadRate: 712, categories: ALL_CATS },
 
   // ─── HALIFAX ─────────────────────────────────────────────────────────────
-  { handle: "@northlyhalifax", subNetwork: "northly", platform: "instagram", market: "halifax", marketLabel: "Halifax", region: "Nova Scotia", followers: 56900, baseRate: 405, storyRate: 203, ocRate: 1405, talkingHeadRate: 805, categories: ALL_CATS },
+  { handle: "@northlyhalifax", subNetwork: "northly", platform: "instagram", market: "halifax", marketLabel: "Halifax", region: "Nova Scotia", followers: 56900, baseRate: 405, storyRate: 203, gaRate: 486, ocRate: 1405, talkingHeadRate: 805, categories: ALL_CATS },
 ];
 
 export const ACCOUNTS_SEED: AccountSeed[] = RAW.map((r) => ({
