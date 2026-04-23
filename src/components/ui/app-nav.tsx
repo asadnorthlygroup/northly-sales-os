@@ -57,6 +57,9 @@ export function AppNav({ page, showBack = false, backHref }: AppNavProps) {
         {/* Right: nav links + actions */}
         <div className="flex items-center gap-1 shrink-0">
           <Button variant="ghost" size="sm" asChild className="text-slate-600 hidden md:flex">
+            <Link href="/proposals">Proposals</Link>
+          </Button>
+          <Button variant="ghost" size="sm" asChild className="text-slate-600 hidden md:flex">
             <Link href="/deals">Pipeline</Link>
           </Button>
           <Button variant="ghost" size="sm" asChild className="text-slate-600 hidden md:flex">
