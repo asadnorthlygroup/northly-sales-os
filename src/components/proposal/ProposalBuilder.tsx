@@ -553,7 +553,7 @@ export default function ProposalBuilder() {
       </div>
     </div>
 
-    {showIOModal && selectedAccounts.length > 0 && (
+    {showIOModal && (
       <IOGeneratorModal
         businessName={form.businessName || "Client"}
         cities={form.cities}
