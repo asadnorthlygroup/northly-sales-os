@@ -211,12 +211,36 @@ function AIBtn({ loading, onClick, label = "AI Fill" }: {
 export default function ProposalBuilder() {
   const searchParams = useSearchParams();
   const [form, setForm] = useState<ProposalForm>(() => {
-    // Pre-fill from Close CRM URL params when navigating from Leads page
-    const businessName = searchParams.get("businessName") ?? "";
+    const businessName = searchParams.get("businessName") ?? searchParams.get("company") ?? "";
     const contactName = searchParams.get("contactName") ?? "";
     const businessInfo = searchParams.get("businessInfo") ?? "";
     if (!businessName) return DEFAULT_FORM;
-    return { ...DEFAULT_FORM, businessName, contactName, businessInfo };
+
+    // Map market label → CITY_GROUPS key
+    const marketParam = (searchParams.get("market") ?? "").toLowerCase();
+    const MARKET_KEY_MAP: Record<string, string> = {
+      toronto: "toronto", hamilton: "hamilton", ottawa: "ottawa",
+      vancouver: "vancouver", calgary: "calgary", edmonton: "edmonton",
+      montreal: "montreal", winnipeg: "winnipeg", halifax: "halifax",
+      saskatoon: "saskatoon", kitchener: "kitchener", windsor: "windsor",
+      national: "national", brampton: "gta", mississauga: "gta",
+      durham: "gta", "york region": "gta", "london on": "london",
+    };
+    const cities = marketParam && MARKET_KEY_MAP[marketParam]
+      ? [MARKET_KEY_MAP[marketParam]]
+      : DEFAULT_FORM.cities;
+
+    // Map industry param → BusinessCategory
+    const VALID_CATEGORIES: BusinessCategory[] = [
+      "restaurant", "bar", "beauty", "service", "retail",
+      "event_space", "app", "ecommerce", "gifting",
+    ];
+    const industryParam = searchParams.get("industry") ?? "";
+    const category = VALID_CATEGORIES.includes(industryParam as BusinessCategory)
+      ? (industryParam as BusinessCategory)
+      : DEFAULT_FORM.category;
+
+    return { ...DEFAULT_FORM, businessName, contactName, businessInfo, cities, category };
   });
   const [closeLeadId] = useState<string | null>(() => searchParams.get("closeLeadId"));
   const [step, setStep] = useState(1);
