@@ -78,6 +78,9 @@ export function AppNav({ page, showBack = false, backHref }: AppNavProps) {
             <Link href="/invoices">Invoices</Link>
           </Button>
           <Button variant="ghost" size="sm" asChild className="text-slate-600 hidden md:flex">
+            <Link href="/packages">Packages</Link>
+          </Button>
+          <Button variant="ghost" size="sm" asChild className="text-slate-600 hidden md:flex">
             <Link href="/pricing">Pricing</Link>
           </Button>
           <div className="w-px h-4 bg-slate-200 mx-1 hidden md:block" />

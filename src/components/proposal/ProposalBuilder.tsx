@@ -21,7 +21,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Copy, Mail, MapPin, DollarSign, Layers, Sparkles,
   ChevronRight, ChevronLeft, Check, Save, Loader2, FileText,
-  ExternalLink, Mic, MicOff, Pencil, X, Wand2, Users,
+  ExternalLink, Mic, MicOff, Pencil, X, Wand2, Users, Package,
 } from "lucide-react";
 import { AppNav } from "@/components/ui/app-nav";
 import IOGeneratorModal from "@/components/proposal/IOGeneratorModal";
@@ -78,6 +78,19 @@ interface ProposalForm {
   collaboratorHandles: string[];
   collaboratorAdjustMode: "discount" | "surcharge" | "none";
   collaboratorAdjustValue: number;
+}
+
+interface PackageRecord {
+  id: string;
+  title: string;
+  description: string;
+  deliverables: string[];
+  pages_included: string[];
+  primary_page: string | null;
+  collabs: string[];
+  markets: string[];
+  pricing: number;
+  guaranteed_impressions: number | null;
 }
 
 const DEFAULT_FORM: ProposalForm = {
@@ -243,6 +256,7 @@ export default function ProposalBuilder() {
     return { ...DEFAULT_FORM, businessName, contactName, businessInfo, cities, category };
   });
   const [closeLeadId] = useState<string | null>(() => searchParams.get("closeLeadId"));
+  const [packages, setPackages] = useState<PackageRecord[]>([]);
   const [step, setStep] = useState(1);
   const [saving, setSaving] = useState(false);
   const [savedDealId, setSavedDealId] = useState<string | null>(null);
@@ -258,6 +272,42 @@ export default function ProposalBuilder() {
   const reviewIntervalRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
   const { toast } = useToast();
   const router = useRouter();
+
+  // Fetch active packages once on mount
+  useEffect(() => {
+    fetch("/api/packages?status=active")
+      .then((r) => r.json())
+      .then((d) => { if (d.data) setPackages(d.data); })
+      .catch(() => {});
+  }, []);
+
+  // Auto-apply package from URL param
+  useEffect(() => {
+    const pkgId = searchParams.get("packageId");
+    if (pkgId && packages.length > 0) {
+      const pkg = packages.find((p) => p.id === pkgId);
+      if (pkg) applyPackage(pkg);
+    }
+    // intentionally run only when packages load
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [packages]);
+
+  const applyPackage = (pkg: PackageRecord) => {
+    const allPages = [
+      ...(pkg.primary_page ? [pkg.primary_page] : []),
+      ...pkg.pages_included,
+    ];
+    const newSelected: Record<string, boolean> = { ...form.selectedAccounts };
+    allPages.forEach((h) => { newSelected[h] = true; });
+
+    setForm((f) => ({
+      ...f,
+      cities: pkg.markets.length ? pkg.markets : f.cities,
+      selectedAccounts: newSelected,
+      collaboratorHandles: pkg.collabs.length ? pkg.collabs : f.collaboratorHandles,
+      proposedDirection: pkg.description ? pkg.description : f.proposedDirection,
+    }));
+  };
 
   const relevantAccounts = useMemo(
     () => getAccountsForCities(form.cities, form.category),
@@ -511,7 +561,7 @@ export default function ProposalBuilder() {
                 </a>
               </div>
             )}
-            {step === 1 && <Step1Business form={form} setForm={setForm} strategyHook={strategyHook} />}
+            {step === 1 && <Step1Business form={form} setForm={setForm} strategyHook={strategyHook} packages={packages} onApplyPackage={applyPackage} />}
             {step === 2 && <Step2Strategy form={form} setForm={setForm} strategyHook={strategyHook} />}
             {step === 3 && (
               <Step3Pages
@@ -629,10 +679,14 @@ function Step1Business({
   form,
   setForm,
   strategyHook,
+  packages,
+  onApplyPackage,
 }: {
   form: ProposalForm;
   setForm: React.Dispatch<React.SetStateAction<ProposalForm>>;
   strategyHook: string;
+  packages: PackageRecord[];
+  onApplyPackage: (pkg: PackageRecord) => void;
 }) {
   const update = (key: keyof ProposalForm, value: unknown) =>
     setForm((f) => ({ ...f, [key]: value }));
@@ -694,7 +748,60 @@ function Step1Business({
     });
   };
 
+  const [selectedPkgId, setSelectedPkgId] = useState<string>("");
+
   return (
+    <>
+    {packages.length > 0 && (
+      <Card className="rounded-2xl shadow-sm border-slate-200 bg-slate-50/80">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Package className="h-4 w-4 text-[#E8192C]" />
+            Load from Package
+          </CardTitle>
+          <CardDescription>Select a saved package to auto-populate markets, pages, collabs, and direction.</CardDescription>
+        </CardHeader>
+        <CardContent className="flex items-center gap-3 flex-wrap">
+          <Select value={selectedPkgId} onValueChange={(val) => {
+            setSelectedPkgId(val);
+          }}>
+            <SelectTrigger className="w-72 bg-white">
+              <SelectValue placeholder="Select a package…" />
+            </SelectTrigger>
+            <SelectContent>
+              {packages.map((p) => (
+                <SelectItem key={p.id} value={p.id}>{p.title}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            type="button"
+            disabled={!selectedPkgId}
+            onClick={() => {
+              const pkg = packages.find((p) => p.id === selectedPkgId);
+              if (pkg) onApplyPackage(pkg);
+            }}
+            className="bg-[#E8192C] hover:bg-[#c0141f]"
+            size="sm"
+          >
+            Apply Package
+          </Button>
+          {selectedPkgId && (() => {
+            const pkg = packages.find((p) => p.id === selectedPkgId);
+            if (!pkg) return null;
+            return (
+              <div className="text-xs text-slate-500 flex flex-wrap gap-3">
+                {pkg.markets.length > 0 && <span>Markets: <strong className="text-slate-700">{pkg.markets.join(", ")}</strong></span>}
+                {(pkg.pages_included.length > 0 || pkg.primary_page) && (
+                  <span>Pages: <strong className="text-slate-700">{[pkg.primary_page, ...pkg.pages_included].filter(Boolean).length}</strong></span>
+                )}
+                {pkg.pricing > 0 && <span>Ref price: <strong className="text-slate-700">${pkg.pricing.toLocaleString()}</strong></span>}
+              </div>
+            );
+          })()}
+        </CardContent>
+      </Card>
+    )}
     <Card className="rounded-2xl shadow-sm">
       <CardHeader>
         <CardTitle>Step 1: Business Details</CardTitle>
@@ -924,6 +1031,7 @@ function Step1Business({
         </div>
       </CardContent>
     </Card>
+    </>
   );
 }
 
