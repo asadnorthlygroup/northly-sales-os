@@ -104,19 +104,19 @@ export function AppNav({ page, showBack = false, backHref }: AppNavProps) {
 
           <Link
             href="/"
-            className="flex items-center gap-2.5 hover:opacity-80 transition-opacity shrink-0"
+            className="flex items-center gap-2 hover:opacity-80 transition-opacity shrink-0"
           >
-            <div className="h-8 w-8 rounded-lg bg-[#E8192C] flex items-center justify-center">
+            <div className="h-8 w-8 rounded-lg bg-[#E8192C] flex items-center justify-center shrink-0">
               <span className="text-white font-bold text-sm">N</span>
             </div>
-            <span className="font-semibold text-sm hidden sm:block">Northly Sales OS</span>
+            {/* Brand text only when no sub-page is active */}
+            {!page && (
+              <span className="font-semibold text-sm hidden lg:block">Northly Sales OS</span>
+            )}
           </Link>
 
           {page && (
-            <>
-              <span className="text-slate-300 hidden sm:block">/</span>
-              <span className="text-sm font-medium text-slate-700 truncate hidden sm:block">{page}</span>
-            </>
+            <span className="text-sm font-medium text-slate-700 truncate hidden sm:block">{page}</span>
           )}
         </div>
 
