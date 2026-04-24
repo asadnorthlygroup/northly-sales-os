@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   Save, RefreshCw, TrendingUp, TrendingDown, Minus, Loader2, CheckCircle,
 } from "lucide-react";
+import { createClient } from "@supabase/supabase-js";
 import { ACCOUNTS_SEED, type AccountSeed } from "@/lib/accounts-seed";
 import {
   computeAccountRates, formatCurrency, DEFAULT_PRICING_CONFIG, type PricingConfig,
@@ -171,10 +172,12 @@ export default function PricingPage() {
   const [userEmail, setUserEmail] = useState<string>("");
 
   useEffect(() => {
-    import("@supabase/supabase-js").then(({ createClient }) => {
-      const s = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
-      s.auth.getUser().then(({ data }) => { if (data.user?.email) setUserEmail(data.user.email); });
+    let cancelled = false;
+    const s = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+    s.auth.getUser().then(({ data }) => {
+      if (!cancelled && data.user?.email) setUserEmail(data.user.email);
     });
+    return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {

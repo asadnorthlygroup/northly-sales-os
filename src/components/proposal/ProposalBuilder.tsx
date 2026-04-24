@@ -297,13 +297,14 @@ export default function ProposalBuilder() {
       .catch(() => {});
 
     // Identify current user for admin-gated features
-    try {
-      const sb = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      );
-      sb.auth.getUser().then(({ data }) => setUserEmail(data.user?.email ?? null));
-    } catch { /* ignore */ }
+    let cancelled = false;
+    const sb = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+    sb.auth.getUser().then(({ data }) => {
+      if (!cancelled) setUserEmail(data.user?.email ?? null);
+    });
 
     // Show toast if we restored a draft
     const hasSaved = typeof window !== "undefined" && !!localStorage.getItem(DRAFT_KEY);
@@ -312,6 +313,8 @@ export default function ProposalBuilder() {
       searchParams.get("closeLeadId") || searchParams.get("packageId")
     );
     if (hasSaved && !hasUrlParams) setDraftRestored(true);
+
+    return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

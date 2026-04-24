@@ -290,7 +290,6 @@ export default function ProposalsPage() {
         const list: Proposal[] = data ?? [];
         setProposals(list);
         setLoading(false);
-        // Load feedback for all proposals in parallel
         Promise.all(
           list.map((p) =>
             fetch(`/api/proposals/feedback?proposalId=${p.id}`)
@@ -305,7 +304,8 @@ export default function ProposalsPage() {
           });
           setFeedbackMap(map);
         });
-      });
+      })
+      .catch(() => setLoading(false));
   }, []);
 
   useEffect(() => { loadProposals(mineOnly); }, [mineOnly, loadProposals]);
@@ -460,9 +460,14 @@ export default function ProposalsPage() {
               <table className="w-full text-sm">
                 <thead className="bg-slate-50 border-b">
                   <tr>
-                    {["Client", "Deal", "Markets", "Pages", "Option 2", "Status", "Creator", "Date", ""].map((h) => (
-                      <th key={h} className="px-4 py-3 text-left font-medium text-slate-600 whitespace-nowrap">{h}</th>
-                    ))}
+                    <th className="px-4 py-2.5 text-left font-medium text-slate-600">Client</th>
+                    <th className="px-4 py-2.5 text-left font-medium text-slate-600 hidden lg:table-cell">Deal</th>
+                    <th className="px-4 py-2.5 text-left font-medium text-slate-600 hidden md:table-cell">Markets</th>
+                    <th className="px-4 py-2.5 text-left font-medium text-slate-600">Price</th>
+                    <th className="px-4 py-2.5 text-left font-medium text-slate-600">Status</th>
+                    <th className="px-4 py-2.5 text-left font-medium text-slate-600 hidden xl:table-cell">By</th>
+                    <th className="px-4 py-2.5 text-left font-medium text-slate-600 hidden sm:table-cell">Date</th>
+                    <th className="px-4 py-2.5" />
                   </tr>
                 </thead>
                 <tbody className="divide-y">
@@ -471,46 +476,43 @@ export default function ProposalsPage() {
                     const opt2 = p.ladder_data?.option2Price;
                     return (
                       <tr key={p.id} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-4 py-3 cursor-pointer" onClick={() => setSelected(p)}>
-                          <div className="font-medium">{p.deals?.clients?.company_name ?? "—"}</div>
+                        <td className="px-4 py-2.5 cursor-pointer" onClick={() => setSelected(p)}>
+                          <div className="font-medium leading-snug">{p.deals?.clients?.company_name ?? "—"}</div>
                           {p.deals?.clients?.primary_contact_name && (
                             <div className="text-xs text-muted-foreground">{p.deals.clients.primary_contact_name}</div>
                           )}
                         </td>
-                        <td className="px-4 py-3 max-w-[200px] cursor-pointer" onClick={() => setSelected(p)}>
-                          <div className="truncate text-slate-700">{p.deals?.title ?? "—"}</div>
+                        <td className="px-4 py-2.5 max-w-[180px] hidden lg:table-cell cursor-pointer" onClick={() => setSelected(p)}>
+                          <div className="truncate text-slate-700 text-xs">{p.deals?.title ?? "—"}</div>
                           {p.deals?.goal && (
                             <div className="text-xs text-muted-foreground truncate">{p.deals.goal}</div>
                           )}
                         </td>
-                        <td className="px-4 py-3 cursor-pointer" onClick={() => setSelected(p)}>
+                        <td className="px-4 py-2.5 hidden md:table-cell cursor-pointer" onClick={() => setSelected(p)}>
                           <div className="flex flex-wrap gap-1">
                             {(p.deals?.cities ?? []).slice(0, 2).map((c) => (
-                              <Badge key={c} variant="secondary" className="text-xs">{c}</Badge>
+                              <Badge key={c} variant="secondary" className="text-xs capitalize">{c}</Badge>
                             ))}
                             {(p.deals?.cities ?? []).length > 2 && (
                               <Badge variant="secondary" className="text-xs">+{(p.deals?.cities ?? []).length - 2}</Badge>
                             )}
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-slate-600 cursor-pointer" onClick={() => setSelected(p)}>
-                          {(p.selected_accounts ?? []).length}
-                        </td>
-                        <td className="px-4 py-3 font-semibold whitespace-nowrap cursor-pointer" onClick={() => setSelected(p)}>
+                        <td className="px-4 py-2.5 font-semibold whitespace-nowrap cursor-pointer" onClick={() => setSelected(p)}>
                           {opt2 ? formatCurrency(opt2) : "—"}
                         </td>
-                        <td className="px-4 py-3 cursor-pointer" onClick={() => setSelected(p)}>
+                        <td className="px-4 py-2.5 cursor-pointer" onClick={() => setSelected(p)}>
                           <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${cfg.color}`}>
                             {cfg.label}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-slate-500 text-xs cursor-pointer" onClick={() => setSelected(p)}>
+                        <td className="px-4 py-2.5 text-slate-400 text-xs hidden xl:table-cell cursor-pointer" onClick={() => setSelected(p)}>
                           {p.created_by_email ? p.created_by_email.split("@")[0] : "—"}
                         </td>
-                        <td className="px-4 py-3 text-slate-500 whitespace-nowrap cursor-pointer" onClick={() => setSelected(p)}>
+                        <td className="px-4 py-2.5 text-slate-500 text-xs whitespace-nowrap hidden sm:table-cell cursor-pointer" onClick={() => setSelected(p)}>
                           {new Date(p.created_at).toLocaleDateString("en-CA", { month: "short", day: "numeric" })}
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-2.5">
                           <div className="flex items-center gap-1.5">
                             <button
                               onClick={(e) => { e.stopPropagation(); setIoProposal(p); }}

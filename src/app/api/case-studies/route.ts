@@ -50,12 +50,22 @@ async function getSession() {
 }
 
 async function ensureBucket(admin: ReturnType<typeof adminClient>) {
-  await admin.storage.createBucket(BUCKET, { public: false }).catch(() => {});
+  const { error } = await admin.storage.createBucket(BUCKET, { public: false });
+  // "already exists" is the expected happy path — only log real errors
+  if (error && !error.message.toLowerCase().includes("already exists")) {
+    console.error("[case-studies] bucket create error:", error.message);
+  }
 }
 
 async function readIndex(admin: ReturnType<typeof adminClient>): Promise<CaseStudySummary[]> {
   const { data, error } = await admin.storage.from(BUCKET).download(INDEX_PATH);
-  if (error || !data) return [];
+  if (error) {
+    if (!error.message.toLowerCase().includes("not found")) {
+      console.error("[case-studies] index read error:", error.message);
+    }
+    return [];
+  }
+  if (!data) return [];
   try {
     const text = await data.text();
     return JSON.parse(text) as CaseStudySummary[];
@@ -66,7 +76,8 @@ async function readIndex(admin: ReturnType<typeof adminClient>): Promise<CaseStu
 
 async function writeIndex(admin: ReturnType<typeof adminClient>, index: CaseStudySummary[]) {
   const blob = new Blob([JSON.stringify(index)], { type: "application/json" });
-  await admin.storage.from(BUCKET).upload(INDEX_PATH, blob, { upsert: true });
+  const { error } = await admin.storage.from(BUCKET).upload(INDEX_PATH, blob, { upsert: true });
+  if (error) console.error("[case-studies] index write error:", error.message);
 }
 
 export async function GET(request: NextRequest) {

@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/select";
 import {
   BookOpen, Plus, Search, X, Pencil, Trash2, Link2, FileText, StickyNote,
-  ChevronDown, ChevronUp, ExternalLink,
+  ChevronDown, ChevronUp, ExternalLink, Loader2,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { CaseStudyFull, CaseStudySummary } from "@/app/api/case-studies/route";
@@ -81,15 +81,20 @@ export default function CaseStudiesPage() {
 
   const fetchStudies = useCallback(async () => {
     setLoading(true);
-    const params = new URLSearchParams();
-    if (nicheFilter !== "all") params.set("niche", nicheFilter);
-    if (search) params.set("q", search);
-    if (mineOnly) params.set("mine", "true");
-    const res = await fetch(`/api/case-studies?${params}`);
-    const data = await res.json();
-    setStudies(data.data ?? []);
-    setLoading(false);
-  }, [nicheFilter, search, mineOnly]);
+    try {
+      const params = new URLSearchParams();
+      if (nicheFilter !== "all") params.set("niche", nicheFilter);
+      if (search) params.set("q", search);
+      if (mineOnly) params.set("mine", "true");
+      const res = await fetch(`/api/case-studies?${params}`);
+      const data = await res.json();
+      setStudies(data.data ?? []);
+    } catch {
+      toast({ title: "Failed to load case studies", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  }, [nicheFilter, search, mineOnly, toast]);
 
   useEffect(() => { fetchStudies(); }, [fetchStudies]);
 
@@ -149,9 +154,14 @@ export default function CaseStudiesPage() {
 
   const deleteStudy = async (id: string) => {
     if (!confirm("Delete this case study?")) return;
-    await fetch(`/api/case-studies/${id}`, { method: "DELETE" });
-    toast({ title: "Deleted" });
-    fetchStudies();
+    try {
+      const res = await fetch(`/api/case-studies/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Delete failed");
+      toast({ title: "Case study deleted" });
+      fetchStudies();
+    } catch {
+      toast({ title: "Delete failed", variant: "destructive" });
+    }
   };
 
   const nicheLabel = (n: string) => NICHES.find((x) => x.value === n)?.label ?? n;
@@ -280,7 +290,10 @@ export default function CaseStudiesPage() {
 
         {/* List */}
         {loading ? (
-          <div className="text-center py-20 text-slate-400">Loading…</div>
+          <div className="flex flex-col items-center justify-center py-20 text-slate-400 gap-3">
+            <Loader2 className="h-6 w-6 animate-spin" />
+            <span className="text-sm">Loading case studies…</span>
+          </div>
         ) : studies.length === 0 ? (
           <div className="text-center py-20 text-slate-400">
             <BookOpen className="h-12 w-12 mx-auto mb-4 opacity-30" />
