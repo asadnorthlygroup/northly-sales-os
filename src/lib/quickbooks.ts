@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 
-const QB_API_BASE = "https://sandbox-quickbooks.api.intuit.com/v3/company";
+const QB_API_BASE = "https://quickbooks.api.intuit.com/v3/company";
 const QB_TOKEN_URL = "https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer";
 
 function serviceSupabase() {

@@ -258,14 +258,14 @@ export async function POST(request: NextRequest) {
 
     const retryData = await retryRes.json();
     const inv = retryData.Invoice;
-    const qbUrl = `https://sandbox.qbo.intuit.com/app/invoice?txnId=${inv.Id}`;
+    const qbUrl = `https://app.qbo.intuit.com/app/invoice?txnId=${inv.Id}`;
     await saveInvoiceLocally(inv, body, taxAmount, total, qbUrl, session.user.id);
     return NextResponse.json({ invoiceId: inv.Id, invoiceNumber: inv.DocNumber, total, qbUrl });
   }
 
   const data = await invoiceRes.json();
   const inv = data.Invoice;
-  const qbUrl = `https://sandbox.qbo.intuit.com/app/invoice?txnId=${inv.Id}`;
+  const qbUrl = `https://app.qbo.intuit.com/app/invoice?txnId=${inv.Id}`;
   await saveInvoiceLocally(inv, body, taxAmount, total, qbUrl, session.user.id);
 
   return NextResponse.json({ invoiceId: inv.Id, invoiceNumber: inv.DocNumber, total, qbUrl });
