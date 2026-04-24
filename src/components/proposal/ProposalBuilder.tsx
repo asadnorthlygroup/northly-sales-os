@@ -129,6 +129,7 @@ const DEFAULT_FORM: ProposalForm = {
 };
 
 const STEPS = ["Business", "Strategy", "Pages & Pricing", "Output"] as const;
+const DRAFT_KEY = "northly_proposal_draft";
 
 // ─────────────────────────────────────────────
 // Voice recording hook
@@ -221,10 +222,23 @@ function AIBtn({ loading, onClick, label = "AI Fill" }: {
 // ─────────────────────────────────────────────
 export default function ProposalBuilder() {
   const searchParams = useSearchParams();
+  const [draftRestored, setDraftRestored] = useState(false);
   const [form, setForm] = useState<ProposalForm>(() => {
     const businessName = searchParams.get("businessName") ?? searchParams.get("company") ?? "";
     const contactName = searchParams.get("contactName") ?? "";
     const businessInfo = searchParams.get("businessInfo") ?? "";
+    const hasUrlParams = !!(businessName || searchParams.get("closeLeadId") || searchParams.get("packageId"));
+
+    if (!hasUrlParams) {
+      try {
+        const saved = typeof window !== "undefined" ? localStorage.getItem(DRAFT_KEY) : null;
+        if (saved) {
+          const parsed = JSON.parse(saved) as Partial<ProposalForm>;
+          return { ...DEFAULT_FORM, ...parsed };
+        }
+      } catch { /* ignore */ }
+    }
+
     if (!businessName) return DEFAULT_FORM;
 
     // Map market label → CITY_GROUPS key
@@ -277,7 +291,24 @@ export default function ProposalBuilder() {
       .then((r) => r.json())
       .then((d) => { if (d.data) setPackages(d.data); })
       .catch(() => {});
+
+    // Show toast if we restored a draft
+    const hasSaved = typeof window !== "undefined" && !!localStorage.getItem(DRAFT_KEY);
+    const hasUrlParams = !!(
+      searchParams.get("businessName") || searchParams.get("company") ||
+      searchParams.get("closeLeadId") || searchParams.get("packageId")
+    );
+    if (hasSaved && !hasUrlParams) setDraftRestored(true);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Auto-save form to localStorage on every change (debounced 800ms)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      try { localStorage.setItem(DRAFT_KEY, JSON.stringify(form)); } catch { /* ignore */ }
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [form]);
 
   // Auto-apply package from URL param
   useEffect(() => {
@@ -489,6 +520,8 @@ export default function ProposalBuilder() {
       if (!res.ok) throw new Error(data.error ?? "Save failed");
       setSavedDealId(data.dealId);
       setSavedProposalId(data.proposalId);
+      try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
+      setDraftRestored(false);
       toast({ title: "Proposal saved!", description: "Added to your Deals Pipeline." });
     } catch (err) {
       toast({ title: "Save failed", description: String(err), variant: "destructive" });
@@ -561,6 +594,23 @@ export default function ProposalBuilder() {
 
           {/* Main content */}
           <div className="space-y-4">
+            {draftRestored && (
+              <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
+                <span className="font-semibold">Draft restored</span>
+                <span className="text-amber-400">·</span>
+                <span>Your previous work was saved automatically. Pick up where you left off.</span>
+                <button
+                  className="ml-auto text-amber-600 hover:text-amber-900 underline text-xs font-medium"
+                  onClick={() => {
+                    setForm(DEFAULT_FORM);
+                    try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
+                    setDraftRestored(false);
+                  }}
+                >
+                  Discard draft
+                </button>
+              </div>
+            )}
             {step === 1 && closeLeadId && (
               <div className="flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm text-blue-700">
                 <span className="font-semibold">From Close CRM</span>

@@ -21,37 +21,37 @@ const PROVINCE_MAP: Record<string, string> = {
   "Prince Edward Island": "PE", "Quebec": "QC", "Saskatchewan": "SK", "Yukon": "YT",
 };
 
+// Inject a global style so the pac-container floats above the modal z-stack
+function ensurePacContainerStyle() {
+  if (document.getElementById("pac-container-fix")) return;
+  const style = document.createElement("style");
+  style.id = "pac-container-fix";
+  style.textContent = ".pac-container { z-index: 99999 !important; }";
+  document.head.appendChild(style);
+}
+
 function usePlacesAutocomplete(
   inputRef: React.RefObject<HTMLInputElement | null>,
   onPlace: (parts: { street: string; city: string; province: string; postal: string }) => void
 ) {
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
+  const onPlaceRef = useRef(onPlace);
+  useEffect(() => { onPlaceRef.current = onPlace; }, [onPlace]);
 
   useEffect(() => {
     const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-    if (!apiKey || !inputRef.current) return;
+    if (!apiKey) return;
 
-    // Load the Maps JS SDK if not already present
+    ensurePacContainerStyle();
+
     const scriptId = "google-maps-places";
-    if (!document.getElementById(scriptId)) {
-      const script = document.createElement("script");
-      script.id = scriptId;
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
-      script.async = true;
-      script.defer = true;
-      document.head.appendChild(script);
-      script.onload = () => initAutocomplete();
-    } else if (window.google?.maps?.places) {
-      initAutocomplete();
-    } else {
-      // Script tag exists but not yet loaded — wait
-      const existing = document.getElementById(scriptId) as HTMLScriptElement;
-      existing.addEventListener("load", initAutocomplete);
-      return () => existing.removeEventListener("load", initAutocomplete);
-    }
 
     function initAutocomplete() {
-      if (!inputRef.current || autocompleteRef.current) return;
+      if (!inputRef.current) return;
+      if (autocompleteRef.current) {
+        window.google?.maps?.event?.clearInstanceListeners(autocompleteRef.current);
+        autocompleteRef.current = null;
+      }
       const ac = new window.google.maps.places.Autocomplete(inputRef.current, {
         componentRestrictions: { country: "ca" },
         fields: ["address_components"],
@@ -72,7 +72,7 @@ function usePlacesAutocomplete(
           else if (t.includes("postal_code")) postal = comp.long_name;
         }
 
-        onPlace({
+        onPlaceRef.current({
           street: [streetNumber, route].filter(Boolean).join(" "),
           city,
           province: PROVINCE_MAP[provinceLong] ?? "ON",
@@ -81,7 +81,27 @@ function usePlacesAutocomplete(
       });
     }
 
+    // Give the input a moment to mount, then attach
+    const timer = setTimeout(() => {
+      if (!document.getElementById(scriptId)) {
+        const script = document.createElement("script");
+        script.id = scriptId;
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
+        script.async = true;
+        document.head.appendChild(script);
+        script.onload = initAutocomplete;
+      } else if (window.google?.maps?.places) {
+        initAutocomplete();
+      } else {
+        const existing = document.getElementById(scriptId) as HTMLScriptElement;
+        const handler = () => initAutocomplete();
+        existing.addEventListener("load", handler);
+        return () => existing.removeEventListener("load", handler);
+      }
+    }, 100);
+
     return () => {
+      clearTimeout(timer);
       if (autocompleteRef.current) {
         window.google?.maps?.event?.clearInstanceListeners(autocompleteRef.current);
         autocompleteRef.current = null;
