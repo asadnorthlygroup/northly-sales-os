@@ -65,16 +65,15 @@ interface ProposalForm {
   option3Discount: number;
   option4Discount: number;
   option5Discount: number;
-  markupMode: "flat" | "percentage";
+  markupMode: "flat" | "percentage" | "none";
   markupPercentage: number;
   displayMode: "itemized" | "package";
   includeBA: boolean;
   includeLTO: boolean;
-  includeOC: boolean;
-  includeGA: boolean;
   notes: string;
   selectedAccounts: Record<string, boolean>;
   customPrices: Record<string, number>;
+  accountDeliverables: Record<string, { ga: number; oc: number; th: number }>;
   collaboratorHandles: string[];
   collaboratorAdjustMode: "discount" | "surcharge" | "none";
   collaboratorAdjustValue: number;
@@ -115,16 +114,15 @@ const DEFAULT_FORM: ProposalForm = {
   option3Discount: 30,
   option4Discount: 35,
   option5Discount: 40,
-  markupMode: "percentage",
+  markupMode: "none",
   markupPercentage: 20,
   displayMode: "package",
   includeBA: true,
   includeLTO: false,
-  includeOC: false,
-  includeGA: false,
   notes: "",
   selectedAccounts: {},
   customPrices: {},
+  accountDeliverables: {},
   collaboratorHandles: [],
   collaboratorAdjustMode: "none",
   collaboratorAdjustValue: 15,
@@ -330,17 +328,21 @@ export default function ProposalBuilder() {
     [relevantAccounts, form.selectedAccounts]
   );
 
+  const applyMarkup = useCallback(
+    (rate: number): number => {
+      if (form.markupMode === "none") return rate;
+      if (form.markupMode === "percentage") return roundProposalPrice(rate * (1 + form.markupPercentage / 100));
+      return applyFlatMarkup(rate, DEFAULT_PRICING_CONFIG);
+    },
+    [form.markupMode, form.markupPercentage]
+  );
+
   const priceOf = useCallback(
     (account: AccountSeed): number => {
       if (form.customPrices[account.handle] !== undefined) {
         return form.customPrices[account.handle];
       }
-      let price: number;
-      if (form.markupMode === "percentage") {
-        price = roundProposalPrice(account.baseRate * (1 + form.markupPercentage / 100));
-      } else {
-        price = applyFlatMarkup(account.baseRate, DEFAULT_PRICING_CONFIG);
-      }
+      let price = applyMarkup(account.baseRate);
       if (form.collaboratorHandles.includes(account.handle)) {
         if (form.collaboratorAdjustMode === "discount") {
           price = roundProposalPrice(price * (1 - form.collaboratorAdjustValue / 100));
@@ -350,12 +352,25 @@ export default function ProposalBuilder() {
       }
       return price;
     },
-    [form.customPrices, form.collaboratorHandles, form.collaboratorAdjustMode, form.collaboratorAdjustValue, form.markupMode, form.markupPercentage]
+    [applyMarkup, form.customPrices, form.collaboratorHandles, form.collaboratorAdjustMode, form.collaboratorAdjustValue]
+  );
+
+  const deliverableAddonCost = useCallback(
+    (account: AccountSeed): number => {
+      const d = form.accountDeliverables[account.handle];
+      if (!d) return 0;
+      let cost = 0;
+      if (d.ga > 0 && account.gaRate > 0) cost += applyMarkup(account.gaRate) * d.ga;
+      if (d.oc > 0 && account.ocRate > 0) cost += applyMarkup(account.ocRate) * d.oc;
+      if (d.th > 0 && account.talkingHeadRate > 0) cost += applyMarkup(account.talkingHeadRate) * d.th;
+      return cost;
+    },
+    [applyMarkup, form.accountDeliverables]
   );
 
   const selectedBaseTotal = useMemo(
-    () => selectedAccounts.reduce((sum, a) => sum + priceOf(a), 0),
-    [selectedAccounts, priceOf]
+    () => selectedAccounts.reduce((sum, a) => sum + priceOf(a) + deliverableAddonCost(a), 0),
+    [selectedAccounts, priceOf, deliverableAddonCost]
   );
 
   const ladder = useMemo(
@@ -570,6 +585,8 @@ export default function ProposalBuilder() {
                 accountsByCity={accountsByCity}
                 selectedAccounts={selectedAccounts}
                 priceOf={priceOf}
+                deliverableAddonCost={deliverableAddonCost}
+                applyMarkup={applyMarkup}
                 ladder={ladder}
                 toggleAccount={toggleAccount}
               />
@@ -1137,21 +1154,28 @@ function Step2Strategy({
           <div>
             <Label>Agency markup</Label>
             <Select
-              value={form.markupPercentage === 20 ? "small" : form.markupPercentage === 40 ? "large" : "custom"}
+              value={
+                form.markupMode === "none" ? "none"
+                : form.markupPercentage === 20 ? "small"
+                : form.markupPercentage === 40 ? "large"
+                : "custom"
+              }
               onValueChange={(v) => {
-                if (v === "small") setForm((f) => ({ ...f, markupMode: "percentage", markupPercentage: 20 }));
+                if (v === "none") setForm((f) => ({ ...f, markupMode: "none" }));
+                else if (v === "small") setForm((f) => ({ ...f, markupMode: "percentage", markupPercentage: 20 }));
                 else if (v === "large") setForm((f) => ({ ...f, markupMode: "percentage", markupPercentage: 40 }));
                 else setForm((f) => ({ ...f, markupMode: "percentage", markupPercentage: f.markupPercentage === 20 || f.markupPercentage === 40 ? 30 : f.markupPercentage }));
               }}
             >
               <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
               <SelectContent>
+                <SelectItem value="none">No Markup (base rate)</SelectItem>
                 <SelectItem value="small">Small Agency (20% increase)</SelectItem>
                 <SelectItem value="large">Large Agency (40% increase)</SelectItem>
                 <SelectItem value="custom">Custom % increase</SelectItem>
               </SelectContent>
             </Select>
-            {form.markupPercentage !== 20 && form.markupPercentage !== 40 && (
+            {form.markupMode !== "none" && form.markupPercentage !== 20 && form.markupPercentage !== 40 && (
               <div className="flex items-center gap-2 mt-2">
                 <Input
                   type="number"
@@ -1198,7 +1222,7 @@ function Step2Strategy({
         <div>
           <Label className="text-sm font-medium">Campaign types to include</Label>
           <div className="flex gap-4 mt-2">
-            {([["includeBA", "BA (Brand Awareness)"], ["includeLTO", "LTO (Conversion)"], ["includeOC", "OC (Original Content)"], ["includeGA", "GA (Giveaway)"]] as const).map(([key, label]) => (
+            {([["includeBA", "BA (Brand Awareness)"], ["includeLTO", "LTO (Conversion)"]] as const).map(([key, label]) => (
               <label key={key} className="flex items-center gap-2 text-sm cursor-pointer">
                 <Checkbox
                   checked={form[key as keyof ProposalForm] as boolean}
@@ -1208,6 +1232,7 @@ function Step2Strategy({
               </label>
             ))}
           </div>
+          <p className="text-xs text-slate-400 mt-1.5">GA and OC add-ons are set per page in Step 3.</p>
         </div>
 
         <div>
@@ -1238,6 +1263,8 @@ function Step3Pages({
   accountsByCity,
   selectedAccounts,
   priceOf,
+  deliverableAddonCost,
+  applyMarkup,
   ladder,
   toggleAccount,
 }: {
@@ -1246,6 +1273,8 @@ function Step3Pages({
   accountsByCity: Record<string, AccountSeed[]>;
   selectedAccounts: AccountSeed[];
   priceOf: (a: AccountSeed) => number;
+  deliverableAddonCost: (a: AccountSeed) => number;
+  applyMarkup: (rate: number) => number;
   ladder: ReturnType<typeof computeLadderPrices>;
   toggleAccount: (handle: string) => void;
 }) {
@@ -1303,7 +1332,9 @@ function Step3Pages({
             <Badge variant="secondary"><MapPin className="h-3 w-3 mr-1" />{form.cities.map((c) => CITY_GROUPS.find((g) => g.key === c)?.label).join(", ")}</Badge>
             <Badge variant="secondary"><Layers className="h-3 w-3 mr-1" />{CATEGORY_OPTIONS.find((c) => c.value === form.category)?.label}</Badge>
             <Badge variant="secondary"><DollarSign className="h-3 w-3 mr-1" />
-              {form.markupMode === "percentage"
+              {form.markupMode === "none"
+                ? "No markup (base rate)"
+                : form.markupMode === "percentage"
                 ? `${form.markupPercentage}% agency markup`
                 : "+$175 flat markup"} · rounded
             </Badge>
@@ -1435,19 +1466,11 @@ function Step3Pages({
                                 </button>
                               )}
                               <div className={`text-xs ${selected ? "text-white/70" : "text-slate-400"}`}>
-                                per BA Feed Post + 2 Stories
+                                BA Feed Post + 2 Stories
                               </div>
-                              {form.includeGA && account.gaRate > 0 && (
-                                <div className={`text-xs mt-1 ${selected ? "text-white/60" : "text-slate-400"}`}>
-                                  Giveaway: {formatCurrency(roundProposalPrice(account.gaRate * (form.markupMode === "percentage" ? 1 + form.markupPercentage / 100 : 1)))}
-                                </div>
-                              )}
-                              {form.includeOC && account.ocRate > 0 && (
-                                <div className={`text-xs mt-1 ${selected ? "text-white/60" : "text-slate-400"}`}>
-                                  OC Reel: {formatCurrency(roundProposalPrice(account.ocRate * (form.markupMode === "percentage" ? 1 + form.markupPercentage / 100 : 1)))}
-                                  {account.talkingHeadRate > 0 && (
-                                    <> · Talking Head: {formatCurrency(roundProposalPrice(account.talkingHeadRate * (form.markupMode === "percentage" ? 1 + form.markupPercentage / 100 : 1)))}</>
-                                  )}
+                              {selected && deliverableAddonCost(account) > 0 && (
+                                <div className={`text-xs mt-0.5 font-medium ${selected ? "text-white/80" : "text-slate-600"}`}>
+                                  +{formatCurrency(deliverableAddonCost(account))} add-ons
                                 </div>
                               )}
                             </div>
@@ -1484,6 +1507,60 @@ function Step3Pages({
                           >
                             Collab
                           </button>
+                        </div>
+                      )}
+
+                      {/* Per-account add-on deliverables (only when selected) */}
+                      {selected && !isEditing && (account.gaRate > 0 || account.ocRate > 0 || account.talkingHeadRate > 0) && (
+                        <div className="mt-3 pt-3 border-t border-white/20 space-y-1.5" onClick={(e) => e.stopPropagation()}>
+                          <div className="text-xs font-medium text-white/60 uppercase tracking-wide mb-1">Add-ons</div>
+                          {([
+                            ["GA", "ga", account.gaRate] as const,
+                            ["OC Reel", "oc", account.ocRate] as const,
+                            ["Talking Head", "th", account.talkingHeadRate] as const,
+                          ].filter(([, , rate]) => rate > 0)).map(([label, key, rate]) => {
+                            const qty = form.accountDeliverables[account.handle]?.[key] ?? 0;
+                            const unitPrice = applyMarkup(rate);
+                            return (
+                              <div key={key} className="flex items-center justify-between gap-2">
+                                <span className="text-xs text-white/70 flex-1">{label}</span>
+                                <span className="text-xs text-white/50">{formatCurrency(unitPrice)}</span>
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (qty === 0) return;
+                                      setForm((f) => ({
+                                        ...f,
+                                        accountDeliverables: {
+                                          ...f.accountDeliverables,
+                                          [account.handle]: { ...( f.accountDeliverables[account.handle] ?? { ga: 0, oc: 0, th: 0 }), [key]: qty - 1 },
+                                        },
+                                      }));
+                                    }}
+                                    className="h-5 w-5 rounded text-white/70 hover:bg-white/20 flex items-center justify-center text-sm font-bold disabled:opacity-30"
+                                    disabled={qty === 0}
+                                  >−</button>
+                                  <span className={`w-4 text-center text-xs font-semibold ${qty > 0 ? "text-white" : "text-white/40"}`}>{qty}</span>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setForm((f) => ({
+                                        ...f,
+                                        accountDeliverables: {
+                                          ...f.accountDeliverables,
+                                          [account.handle]: { ...( f.accountDeliverables[account.handle] ?? { ga: 0, oc: 0, th: 0 }), [key]: qty + 1 },
+                                        },
+                                      }));
+                                    }}
+                                    className="h-5 w-5 rounded text-white/70 hover:bg-white/20 flex items-center justify-center text-sm font-bold"
+                                  >+</button>
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       )}
                     </button>
