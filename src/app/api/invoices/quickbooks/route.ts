@@ -1,7 +1,45 @@
+import { createClient } from "@supabase/supabase-js";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { qbFetch } from "@/lib/quickbooks";
+
+function adminClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  );
+}
+
+async function saveInvoiceLocally(
+  inv: { Id: string; DocNumber: string },
+  body: { dealId?: string; clientName: string; clientProvince: string; optionNumber: number; subtotal: number; serviceDescription: string; invoiceDate: string; dueDate: string; selectedAccountHandles: string[] },
+  taxAmount: number,
+  total: number,
+  qbUrl: string,
+  userId: string
+) {
+  const admin = adminClient();
+  await admin.from("invoices").insert({
+    deal_id: body.dealId ?? null,
+    client_name: body.clientName,
+    option_number: body.optionNumber,
+    subtotal: body.subtotal,
+    tax_amount: taxAmount,
+    total,
+    province: body.clientProvince,
+    invoice_date: body.invoiceDate,
+    due_date: body.dueDate,
+    service_description: body.serviceDescription || null,
+    selected_accounts: body.selectedAccountHandles ?? [],
+    qb_invoice_id: inv.Id,
+    qb_invoice_number: inv.DocNumber,
+    qb_url: qbUrl,
+    status: "sent",
+    created_by: userId,
+  });
+}
 
 const PROVINCE_TAX: Record<string, { name: string; rate: number }> = {
   ON: { name: "HST", rate: 0.13 },
@@ -220,21 +258,15 @@ export async function POST(request: NextRequest) {
 
     const retryData = await retryRes.json();
     const inv = retryData.Invoice;
-    return NextResponse.json({
-      invoiceId: inv.Id,
-      invoiceNumber: inv.DocNumber,
-      total,
-      qbUrl: `https://sandbox.qbo.intuit.com/app/invoice?txnId=${inv.Id}`,
-    });
+    const qbUrl = `https://sandbox.qbo.intuit.com/app/invoice?txnId=${inv.Id}`;
+    await saveInvoiceLocally(inv, body, taxAmount, total, qbUrl, session.user.id);
+    return NextResponse.json({ invoiceId: inv.Id, invoiceNumber: inv.DocNumber, total, qbUrl });
   }
 
   const data = await invoiceRes.json();
   const inv = data.Invoice;
+  const qbUrl = `https://sandbox.qbo.intuit.com/app/invoice?txnId=${inv.Id}`;
+  await saveInvoiceLocally(inv, body, taxAmount, total, qbUrl, session.user.id);
 
-  return NextResponse.json({
-    invoiceId: inv.Id,
-    invoiceNumber: inv.DocNumber,
-    total,
-    qbUrl: `https://sandbox.qbo.intuit.com/app/invoice?txnId=${inv.Id}`,
-  });
+  return NextResponse.json({ invoiceId: inv.Id, invoiceNumber: inv.DocNumber, total, qbUrl });
 }

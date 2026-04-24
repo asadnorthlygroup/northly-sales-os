@@ -10,31 +10,57 @@ async function fetchWinningExamples(category?: string): Promise<string> {
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.SUPABASE_SERVICE_ROLE_KEY
   );
-  let query = supabase
+
+  // Pull AE-rated wins from proposal_feedback
+  let fbQuery = supabase
     .from("proposal_feedback")
     .select("notes, business_category, markets, goals, proposals(generated_text, intake_data)")
     .in("status", ["won", "sent"])
     .eq("rating", 1)
     .order("updated_at", { ascending: false })
     .limit(3);
-  if (category) query = query.eq("business_category", category);
+  if (category) fbQuery = fbQuery.eq("business_category", category);
+  const { data: fbData } = await fbQuery;
 
-  const { data } = await query;
-  if (!data || data.length === 0) return "";
+  // Pull won deals from PDF library
+  let libQuery = supabase
+    .from("proposal_examples")
+    .select("client_name, industry_category, cities, final_deal_size, chosen_option, strategy_framing, objections, closing_cta")
+    .eq("outcome", "won")
+    .not("strategy_framing", "is", null)
+    .order("ingested_at", { ascending: false })
+    .limit(4);
+  if (category) libQuery = libQuery.eq("industry_category", category);
+  const { data: libData } = await libQuery;
 
-  return data.map((ex, i) => {
-    const proposalArr = ex.proposals as unknown;
-    const proposal = Array.isArray(proposalArr) ? proposalArr[0] : proposalArr;
-    const intake = (proposal as { intake_data?: Record<string, unknown> } | null)?.intake_data ?? {};
-    const snippet = ((proposal as { generated_text?: string | null } | null)?.generated_text ?? "")
-      .substring(0, 600);
-    return `Example ${i + 1} (${ex.business_category ?? "unknown"} — ${(ex.markets ?? []).join(", ")}):
+  const parts: string[] = [];
+
+  if (fbData?.length) {
+    parts.push(fbData.map((ex, i) => {
+      const proposalArr = ex.proposals as unknown;
+      const proposal = Array.isArray(proposalArr) ? proposalArr[0] : proposalArr;
+      const intake = (proposal as { intake_data?: Record<string, unknown> } | null)?.intake_data ?? {};
+      const snippet = ((proposal as { generated_text?: string | null } | null)?.generated_text ?? "").substring(0, 500);
+      return `AE-rated win ${i + 1} (${ex.business_category ?? "unknown"} — ${(ex.markets ?? []).join(", ")}):
 Goals: ${(ex.goals ?? []).join(", ")}
-Challenge: ${(intake as Record<string, string>).challenge ?? ""}
-Proposed direction excerpt: ${(intake as Record<string, string>).proposedDirection ?? ""}
-Proposal opening excerpt: ${snippet}
+Proposed direction: ${(intake as Record<string, string>).proposedDirection ?? ""}
+Proposal excerpt: ${snippet}
 AE notes: ${ex.notes ?? "(none)"}`;
-  }).join("\n\n---\n\n");
+    }).join("\n\n---\n\n"));
+  }
+
+  if (libData?.length) {
+    parts.push(libData.map((ex) =>
+      `Library win (${ex.industry_category ?? "unknown"} — ${(ex.cities ?? []).join(", ")}):` +
+      (ex.final_deal_size ? ` $${ex.final_deal_size.toLocaleString()}` : "") +
+      (ex.chosen_option ? ` | Chose Opt ${ex.chosen_option}` : "") +
+      `\nStrategy: ${ex.strategy_framing ?? ""}` +
+      ((ex.objections ?? []).length > 0 ? `\nObjections overcome: ${ex.objections.join(", ")}` : "") +
+      (ex.closing_cta ? `\nCTA used: ${ex.closing_cta}` : "")
+    ).join("\n\n---\n\n"));
+  }
+
+  return parts.join("\n\n=====\n\n");
 }
 
 export async function POST(request: NextRequest) {

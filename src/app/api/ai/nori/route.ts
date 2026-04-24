@@ -28,6 +28,44 @@ function buildAccountContext(): string {
   }).join("\n\n");
 }
 
+// ─── Fetch won examples from PDF library ──────────────────────────────────────
+async function buildLibraryContext(): Promise<string> {
+  try {
+    const admin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      { auth: { autoRefreshToken: false, persistSession: false } }
+    );
+    const { data } = await admin
+      .from("proposal_examples")
+      .select("client_name, industry_category, cities, outcome, final_deal_size, options_presented, chosen_option, strategy_framing, objections, closing_cta, time_to_close_days")
+      .eq("outcome", "won")
+      .not("strategy_framing", "is", null)
+      .order("ingested_at", { ascending: false })
+      .limit(6);
+
+    if (!data?.length) return "";
+
+    const lines = data.map((ex) => {
+      const parts = [
+        `Client: ${ex.client_name ?? "Unknown"} (${ex.industry_category ?? "unknown industry"})`,
+        `Markets: ${(ex.cities ?? []).join(", ") || "—"}`,
+        ex.final_deal_size ? `Deal size: $${ex.final_deal_size.toLocaleString()}` : null,
+        ex.chosen_option ? `Chose Option ${ex.chosen_option} of [${(ex.options_presented ?? []).join(", ")}]` : null,
+        ex.time_to_close_days ? `Closed in ${ex.time_to_close_days} days` : null,
+        ex.strategy_framing ? `Strategy: ${ex.strategy_framing}` : null,
+        (ex.objections ?? []).length > 0 ? `Objections overcome: ${ex.objections.join(", ")}` : null,
+        ex.closing_cta ? `CTA used: ${ex.closing_cta}` : null,
+      ].filter(Boolean).join(" | ");
+      return `• ${parts}`;
+    }).join("\n");
+
+    return `## Past won deals (from Northly proposal library)\n${lines}`;
+  } catch {
+    return "";
+  }
+}
+
 // ─── Fetch live pipeline context ──────────────────────────────────────────────
 async function buildPipelineContext(): Promise<string> {
   try {
@@ -66,7 +104,7 @@ async function buildPipelineContext(): Promise<string> {
   }
 }
 
-const SYSTEM_PROMPT = (accountCtx: string, pipelineCtx: string) => `You are NORI — Northly's internal AI assistant for the Sales OS platform.
+const SYSTEM_PROMPT = (accountCtx: string, pipelineCtx: string, libraryCtx: string) => `You are NORI — Northly's internal AI assistant for the Sales OS platform.
 
 You help Account Executives (AEs) at Northly Group, a Canadian social media publisher network. Northly operates Instagram, TikTok, and Facebook pages across Canadian cities. AEs use this platform to build proposals, manage deals, and track clients.
 
@@ -107,7 +145,9 @@ ${pipelineCtx}
 - Explaining Northly's network, reach, and value proposition
 - General sales coaching and objection handling
 
-Keep responses concise. Use bullet points for lists. If asked for a pricing estimate, calculate it properly using the rates above.`;
+Keep responses concise. Use bullet points for lists. If asked for a pricing estimate, calculate it properly using the rates above.
+
+${libraryCtx}`.trim();
 
 export async function POST(request: NextRequest) {
   // Auth check
@@ -135,16 +175,17 @@ export async function POST(request: NextRequest) {
     messages: { role: "user" | "assistant"; content: string }[];
   };
 
-  const [accountCtx, pipelineCtx] = await Promise.all([
-    Promise.resolve(buildAccountContext()),
+  const [pipelineCtx, libraryCtx] = await Promise.all([
     buildPipelineContext(),
+    buildLibraryContext(),
   ]);
+  const accountCtx = buildAccountContext();
 
   // Stream the response
   const stream = anthropic.messages.stream({
     model: "claude-haiku-4-5-20251001",
     max_tokens: 1024,
-    system: SYSTEM_PROMPT(accountCtx, pipelineCtx),
+    system: SYSTEM_PROMPT(accountCtx, pipelineCtx, libraryCtx),
     messages,
   });
 

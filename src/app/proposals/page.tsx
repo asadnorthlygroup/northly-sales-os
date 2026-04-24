@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { AppNav } from "@/components/ui/app-nav";
-import { Sparkles, FileText, Clock, Search, Copy, Check, ThumbsUp, ThumbsDown, Send, Trophy } from "lucide-react";
+import { Sparkles, FileText, Clock, Search, Copy, Check, ThumbsUp, ThumbsDown, Send, Trophy, ScrollText } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { formatCurrency } from "@/lib/pricing";
 import type { LadderPrices } from "@/lib/pricing";
@@ -95,6 +95,28 @@ function ProposalDrawer({
   onFeedback: (proposalId: string, update: Partial<FeedbackState>) => void;
 }) {
   const [copied, setCopied] = useState(false);
+  const [generatingAgreement, setGeneratingAgreement] = useState(false);
+
+  async function handleGenerateAgreement() {
+    const optNum = proposal.ladder_data?.option2Price ? 2 : 3;
+    setGeneratingAgreement(true);
+    try {
+      const res = await fetch("/api/proposals/agreement", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ proposalId: proposal.id, optionNumber: optNum }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      const html = await res.text();
+      const blob = new Blob([html], { type: "text/html" });
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank");
+    } catch {
+      alert("Failed to generate agreement. Try again.");
+    } finally {
+      setGeneratingAgreement(false);
+    }
+  }
 
   const copy = async () => {
     if (!proposal.generated_text) return;
@@ -177,6 +199,10 @@ function ProposalDrawer({
           <Button size="sm" variant="outline" onClick={onGenerateIO} className="gap-1.5 border-[#E8192C] text-[#E8192C] hover:bg-red-50">
             <FileText className="h-3.5 w-3.5" />
             Generate IO
+          </Button>
+          <Button size="sm" variant="outline" onClick={handleGenerateAgreement} disabled={generatingAgreement} className="gap-1.5">
+            <ScrollText className="h-3.5 w-3.5" />
+            {generatingAgreement ? "Generating…" : "Agreement"}
           </Button>
           <Button size="sm" asChild className="bg-[#E8192C] hover:bg-[#c0141f] gap-1.5">
             <Link href="/proposals/new">
