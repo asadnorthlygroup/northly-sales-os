@@ -8,11 +8,13 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Sparkles, TrendingUp, Clock, CheckCircle, XCircle,
-  ChevronDown, Receipt, Link2,
+  ChevronDown, Receipt, Link2, UserCircle,
 } from "lucide-react";
 import { AppNav } from "@/components/ui/app-nav";
 import { formatCurrency } from "@/lib/pricing";
 import InvoiceModal from "@/components/deals/InvoiceModal";
+import ClientProfileDrawer from "@/components/deals/ClientProfileDrawer";
+import { computeDealQuality } from "@/lib/deal-quality";
 
 type Deal = {
   id: string;
@@ -21,9 +23,9 @@ type Deal = {
   cities: string[];
   goal: string | null;
   created_at: string;
-  clients: { company_name: string; primary_contact_name: string | null } | null;
+  clients: { id: string; company_name: string; primary_contact_name: string | null } | null;
   users: { full_name: string } | null;
-  proposals: { id: string; ladder_data: Record<string, number>; selected_accounts: string[] }[];
+  proposals: { id: string; ladder_data: Record<string, number>; selected_accounts: string[]; generated_text: string | null }[];
 };
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
@@ -103,6 +105,7 @@ export default function DealsPage() {
   const [filter, setFilter] = useState("all");
   const [invoiceDeal, setInvoiceDeal] = useState<Deal | null>(null);
   const [qbBanner, setQbBanner] = useState<"connected" | "error" | null>(null);
+  const [profileClientId, setProfileClientId] = useState<string | null>(null);
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -113,9 +116,9 @@ export default function DealsPage() {
     const { data } = await supabase
       .from("deals")
       .select(`id, title, status, cities, goal, created_at,
-        clients ( company_name, primary_contact_name ),
+        clients ( id, company_name, primary_contact_name ),
         users ( full_name ),
-        proposals ( id, ladder_data, selected_accounts )`)
+        proposals ( id, ladder_data, selected_accounts, generated_text )`)
       .order("created_at", { ascending: false });
     setDeals((data as unknown as Deal[]) ?? []);
     setLoading(false);
@@ -232,7 +235,7 @@ export default function DealsPage() {
               <table className="w-full text-sm">
                 <thead className="bg-slate-50 border-b">
                   <tr>
-                    {["Client", "Deal", "AE", "Markets", "Status", "Opt 2 Value", "Date", "Actions"].map((h) => (
+                    {["Client", "Deal", "AE", "Markets", "Status", "Score", "Opt 2 Value", "Date", "Actions"].map((h) => (
                       <th key={h} className="px-4 py-3 text-left font-medium text-slate-600 whitespace-nowrap">{h}</th>
                     ))}
                   </tr>
@@ -241,13 +244,27 @@ export default function DealsPage() {
                   {filtered.map((deal) => {
                     const opt2 = deal.proposals?.[0]?.ladder_data?.option2Price;
                     const hasProposal = (deal.proposals?.length ?? 0) > 0;
+                    const quality = computeDealQuality(deal);
                     return (
                       <tr key={deal.id} className="hover:bg-slate-50 transition-colors">
                         <td className="px-4 py-3">
-                          <div className="font-medium">{deal.clients?.company_name ?? "—"}</div>
-                          {deal.clients?.primary_contact_name && (
-                            <div className="text-xs text-muted-foreground">{deal.clients.primary_contact_name}</div>
-                          )}
+                          <div className="flex items-center gap-1.5">
+                            <div>
+                              <div className="font-medium">{deal.clients?.company_name ?? "—"}</div>
+                              {deal.clients?.primary_contact_name && (
+                                <div className="text-xs text-muted-foreground">{deal.clients.primary_contact_name}</div>
+                              )}
+                            </div>
+                            {deal.clients?.id && (
+                              <button
+                                onClick={() => setProfileClientId(deal.clients!.id)}
+                                className="shrink-0 text-slate-300 hover:text-slate-600 transition-colors p-0.5"
+                                title="View client profile"
+                              >
+                                <UserCircle className="h-4 w-4" />
+                              </button>
+                            )}
+                          </div>
                         </td>
                         <td className="px-4 py-3 max-w-[200px]">
                           <div className="truncate font-medium text-slate-800">{deal.title}</div>
@@ -270,6 +287,15 @@ export default function DealsPage() {
                             current={deal.status}
                             onChange={(s) => updateDealStatus(deal.id, s)}
                           />
+                        </td>
+                        <td className="px-4 py-3">
+                          <span
+                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${quality.color}`}
+                            title={quality.breakdown.map((b) => `${b.label}: ${b.earned}/${b.max}`).join("\n")}
+                          >
+                            {quality.score}
+                            <span className="opacity-70 font-normal">{quality.label}</span>
+                          </span>
                         </td>
                         <td className="px-4 py-3 font-semibold whitespace-nowrap">
                           {opt2 ? formatCurrency(opt2) : "—"}
@@ -306,6 +332,14 @@ export default function DealsPage() {
           optionPrices={invoiceDeal.proposals?.[0]?.ladder_data ?? {}}
           selectedAccountHandles={invoiceDeal.proposals?.[0]?.selected_accounts ?? []}
           onClose={() => setInvoiceDeal(null)}
+        />
+      )}
+
+      {/* Client profile drawer */}
+      {profileClientId && (
+        <ClientProfileDrawer
+          clientId={profileClientId}
+          onClose={() => setProfileClientId(null)}
         />
       )}
     </main>
