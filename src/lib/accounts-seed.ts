@@ -98,7 +98,7 @@ const RAW: Array<{
 
   // ─── GTA ─────────────────────────────────────────────────────────────────
   { handle: "@northlybrampton",   subNetwork: "northly",  platform: "instagram", market: "brampton",    marketLabel: "Brampton",    region: "Ontario", followers: 79500, baseRate: 465, storyRate: 232, gaRate: 558, ocRate: 1465, talkingHeadRate:  865, categories: ALL_CATS },
-  { handle: "@waveroombrampton",  subNetwork: "waveroom", platform: "instagram", market: "brampton",    marketLabel: "Brampton",    region: "Ontario", followers: 24700, baseRate: 354, storyRate: 177, gaRate: 424, ocRate: 1354, talkingHeadRate:  754, categories: FOOD_CATS },
+  { handle: "@waveroom.brampton",  subNetwork: "waveroom", platform: "instagram", market: "brampton",    marketLabel: "Brampton",    region: "Ontario", followers: 24700, baseRate: 354, storyRate: 177, gaRate: 424, ocRate: 1354, talkingHeadRate:  754, categories: FOOD_CATS },
   { handle: "@northlymississauga",subNetwork: "northly",  platform: "instagram", market: "mississauga", marketLabel: "Mississauga", region: "Ontario", followers: 16200, baseRate: 260, storyRate: 130, gaRate: 312, ocRate: 1260, talkingHeadRate:  660, categories: ALL_CATS },
   { handle: "@waveroommississauga",subNetwork: "waveroom",platform: "instagram", market: "mississauga", marketLabel: "Mississauga", region: "Ontario", followers: 27900, baseRate: 299, storyRate: 150, gaRate: 359, ocRate: 1299, talkingHeadRate:  699, categories: FOOD_CATS },
   { handle: "@northlydurham",     subNetwork: "northly",  platform: "instagram", market: "durham",      marketLabel: "Durham",      region: "Ontario", followers: 56900, baseRate: 505, storyRate: 252, gaRate: 606, ocRate: 1505, talkingHeadRate:  905, categories: ALL_CATS },
