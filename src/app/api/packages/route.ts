@@ -37,6 +37,7 @@ export async function GET(request: NextRequest) {
   const market = url.searchParams.get("market") ?? "";
   const q = url.searchParams.get("q") ?? "";
 
+  const mine = url.searchParams.get("mine") === "true";
   const admin = adminClient();
   let query = admin
     .from("packages")
@@ -46,10 +47,23 @@ export async function GET(request: NextRequest) {
   if (status !== "all") query = query.eq("status", status);
   if (market) query = query.contains("markets", [market]);
   if (q) query = query.ilike("title", `%${q}%`);
+  if (mine) query = query.eq("created_by", session.user.id);
 
   const { data, error } = await query.limit(200);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ data });
+
+  // Attach creator emails
+  const userIds = [...new Set((data ?? []).map((p: { created_by: string }) => p.created_by).filter(Boolean))];
+  const emailMap: Record<string, string> = {};
+  if (userIds.length > 0) {
+    const { data: users } = await admin.auth.admin.listUsers({ perPage: 200 });
+    for (const u of users?.users ?? []) emailMap[u.id] = u.email ?? "";
+  }
+  const enriched = (data ?? []).map((p: Record<string, unknown>) => ({
+    ...p,
+    created_by_email: emailMap[p.created_by as string] ?? "",
+  }));
+  return NextResponse.json({ data: enriched });
 }
 
 export async function POST(request: NextRequest) {

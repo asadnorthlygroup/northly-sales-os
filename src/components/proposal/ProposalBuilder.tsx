@@ -42,6 +42,9 @@ import {
   DEFAULT_PRICING_CONFIG,
 } from "@/lib/pricing";
 import { useToast } from "@/hooks/use-toast";
+import { createClient } from "@supabase/supabase-js";
+
+const PRICING_ADMIN = "asad@northlygroup.com";
 
 interface ProposalForm {
   businessName: string;
@@ -267,6 +270,7 @@ export default function ProposalBuilder() {
 
     return { ...DEFAULT_FORM, businessName, contactName, businessInfo, cities, category };
   });
+  const [userEmail, setUserEmail] = useState<string | null>(null);
   const [closeLeadId] = useState<string | null>(() => searchParams.get("closeLeadId"));
   const [packages, setPackages] = useState<PackageRecord[]>([]);
   const [step, setStep] = useState(1);
@@ -291,6 +295,15 @@ export default function ProposalBuilder() {
       .then((r) => r.json())
       .then((d) => { if (d.data) setPackages(d.data); })
       .catch(() => {});
+
+    // Identify current user for admin-gated features
+    try {
+      const sb = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
+      sb.auth.getUser().then(({ data }) => setUserEmail(data.user?.email ?? null));
+    } catch { /* ignore */ }
 
     // Show toast if we restored a draft
     const hasSaved = typeof window !== "undefined" && !!localStorage.getItem(DRAFT_KEY);
@@ -627,7 +640,7 @@ export default function ProposalBuilder() {
               </div>
             )}
             {step === 1 && <Step1Business form={form} setForm={setForm} strategyHook={strategyHook} packages={packages} onApplyPackage={applyPackage} />}
-            {step === 2 && <Step2Strategy form={form} setForm={setForm} strategyHook={strategyHook} />}
+            {step === 2 && <Step2Strategy form={form} setForm={setForm} strategyHook={strategyHook} userEmail={userEmail} />}
             {step === 3 && (
               <Step3Pages
                 form={form}
@@ -1109,10 +1122,12 @@ function Step2Strategy({
   form,
   setForm,
   strategyHook,
+  userEmail,
 }: {
   form: ProposalForm;
   setForm: React.Dispatch<React.SetStateAction<ProposalForm>>;
   strategyHook: string;
+  userEmail: string | null;
 }) {
   const update = (key: keyof ProposalForm, value: unknown) =>
     setForm((f) => ({ ...f, [key]: value }));
@@ -1248,9 +1263,10 @@ function Step2Strategy({
             {[2, 3, 4, 5].map((n) => {
               const key = `option${n}Discount` as keyof ProposalForm;
               const val = form[key] as number;
+              const flagged = val > 30 && userEmail !== PRICING_ADMIN;
               return (
                 <div key={n}>
-                  <label className="text-xs text-slate-500 mb-1 block">Option {n}</label>
+                  <label className={`text-xs mb-1 block ${flagged ? "text-amber-600 font-semibold" : "text-slate-500"}`}>Option {n}{flagged ? " ⚑" : ""}</label>
                   <div className="flex items-center gap-1">
                     <Input
                       type="number"
@@ -1258,7 +1274,7 @@ function Step2Strategy({
                       max={60}
                       value={val}
                       onChange={(e) => update(key, parseInt(e.target.value) || 0)}
-                      className="text-center"
+                      className={`text-center ${flagged ? "border-amber-400 bg-amber-50" : ""}`}
                     />
                     <span className="text-sm text-slate-500">%</span>
                   </div>
@@ -1266,6 +1282,15 @@ function Step2Strategy({
               );
             })}
           </div>
+          {userEmail !== PRICING_ADMIN && [form.option2Discount, form.option3Discount, form.option4Discount, form.option5Discount].some((d) => d > 30) && (
+            <div className="mt-3 flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm text-amber-800">
+              <span className="text-base leading-none mt-0.5">⚑</span>
+              <div>
+                <span className="font-semibold">Discount exceeds 30%</span> — primary account discounts over 30% require approval from Asad before sending.
+                <span className="block text-xs text-amber-600 mt-0.5">Collabs can use any adjustment via the collab settings in Step 3.</span>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Campaign types */}

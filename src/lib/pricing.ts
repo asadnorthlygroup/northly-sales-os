@@ -58,27 +58,13 @@ export const FORMAT_FLOORS = {
 export type FormatKey = keyof typeof FORMAT_FLOORS;
 
 /**
- * Round a price to the nearest 00/25/50/75 ending.
- * Searches nearestHundred ± $200. Hard floor: $100.
+ * Round a price to the nearest $50.
+ * Keeps proposal numbers clean and easy to read.
+ * Hard floor: $100.
  */
 export function roundProposalPrice(value: number): number {
   if (value <= 0) return 0;
-  const endings = [0, 25, 50, 75];
-  const nearestHundred = Math.floor(value / 100) * 100;
-  let best = value;
-  let bestDiff = Infinity;
-
-  for (let base = nearestHundred - 100; base <= nearestHundred + 200; base += 100) {
-    for (const ending of endings) {
-      const candidate = base + ending;
-      const diff = Math.abs(candidate - value);
-      if (diff < bestDiff) {
-        bestDiff = diff;
-        best = candidate;
-      }
-    }
-  }
-  return Math.max(100, best);
+  return Math.max(100, Math.round(value / 50) * 50);
 }
 
 /**

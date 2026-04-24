@@ -21,6 +21,8 @@ type Proposal = {
   version: number;
   status: string;
   created_at: string;
+  created_by?: string;
+  created_by_email?: string;
   generated_text: string | null;
   ladder_data: Record<string, number> | null;
   selected_accounts: string[] | null;
@@ -273,12 +275,16 @@ export default function ProposalsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [mineOnly, setMineOnly] = useState(false);
   const [selected, setSelected] = useState<Proposal | null>(null);
   const [ioProposal, setIoProposal] = useState<Proposal | null>(null);
   const [feedbackMap, setFeedbackMap] = useState<FeedbackMap>({});
 
-  useEffect(() => {
-    fetch("/api/proposals")
+  const loadProposals = useCallback((mine: boolean) => {
+    setLoading(true);
+    const params = new URLSearchParams();
+    if (mine) params.set("mine", "true");
+    fetch(`/api/proposals?${params}`)
       .then((r) => r.json())
       .then(({ data }) => {
         const list: Proposal[] = data ?? [];
@@ -301,6 +307,8 @@ export default function ProposalsPage() {
         });
       });
   }, []);
+
+  useEffect(() => { loadProposals(mineOnly); }, [mineOnly, loadProposals]);
 
   const handleFeedback = useCallback(async (proposalId: string, update: Partial<FeedbackState>) => {
     const current = feedbackMap[proposalId] ?? { status: "draft", rating: 0 };
@@ -370,6 +378,18 @@ export default function ProposalsPage() {
 
         {/* Toolbar */}
         <div className="flex flex-wrap items-center gap-3">
+          {/* My / All toggle */}
+          <div className="flex gap-1 p-1 bg-slate-100 rounded-xl">
+            {[{ label: "All", val: false }, { label: "Mine", val: true }].map(({ label, val }) => (
+              <button
+                key={String(val)}
+                onClick={() => setMineOnly(val)}
+                className={`px-3 py-1 rounded-lg text-sm font-medium transition-all ${mineOnly === val ? "bg-white shadow-sm text-slate-900" : "text-slate-500 hover:text-slate-700"}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
           <div className="relative flex-1 min-w-[200px] max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -440,7 +460,7 @@ export default function ProposalsPage() {
               <table className="w-full text-sm">
                 <thead className="bg-slate-50 border-b">
                   <tr>
-                    {["Client", "Deal", "Markets", "Pages", "Option 2", "Status", "Date", ""].map((h) => (
+                    {["Client", "Deal", "Markets", "Pages", "Option 2", "Status", "Creator", "Date", ""].map((h) => (
                       <th key={h} className="px-4 py-3 text-left font-medium text-slate-600 whitespace-nowrap">{h}</th>
                     ))}
                   </tr>
@@ -483,6 +503,9 @@ export default function ProposalsPage() {
                           <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${cfg.color}`}>
                             {cfg.label}
                           </span>
+                        </td>
+                        <td className="px-4 py-3 text-slate-500 text-xs cursor-pointer" onClick={() => setSelected(p)}>
+                          {p.created_by_email ? p.created_by_email.split("@")[0] : "—"}
                         </td>
                         <td className="px-4 py-3 text-slate-500 whitespace-nowrap cursor-pointer" onClick={() => setSelected(p)}>
                           {new Date(p.created_at).toLocaleDateString("en-CA", { month: "short", day: "numeric" })}

@@ -159,6 +159,8 @@ function AccountRow({ account, draftConfig }: { account: AccountSeed; draftConfi
 
 // ─── Page ────────────────────────────────────────────────────────────────────
 
+const PRICING_ADMIN = "asad@northlygroup.com";
+
 export default function PricingPage() {
   const [liveConfig, setLiveConfig] = useState<PricingConfig>(DEFAULT_PRICING_CONFIG);
   const [draftConfig, setDraftConfig] = useState<PricingConfig>(DEFAULT_PRICING_CONFIG);
@@ -166,6 +168,14 @@ export default function PricingPage() {
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [networkTab, setNetworkTab] = useState<string>("all");
+  const [userEmail, setUserEmail] = useState<string>("");
+
+  useEffect(() => {
+    import("@supabase/supabase-js").then(({ createClient }) => {
+      const s = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+      s.auth.getUser().then(({ data }) => { if (data.user?.email) setUserEmail(data.user.email); });
+    });
+  }, []);
 
   useEffect(() => {
     fetch("/api/pricing")
@@ -314,6 +324,11 @@ export default function PricingPage() {
                   <div className="text-xs text-muted-foreground">
                     Changes are previewed live in the table. Push to apply across the entire Sales OS.
                   </div>
+                  {userEmail && userEmail !== PRICING_ADMIN && (
+                    <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-700">
+                      Only <strong>{PRICING_ADMIN}</strong> can push live pricing changes. You can preview but not save.
+                    </div>
+                  )}
                   <div className="flex gap-2">
                     <Button
                       variant="outline"
@@ -328,8 +343,9 @@ export default function PricingPage() {
                     <Button
                       size="sm"
                       onClick={pushToSalesOS}
-                      disabled={!isDirty || saving}
-                      className="flex-1 bg-[#E8192C] hover:bg-[#c0141f]"
+                      disabled={!isDirty || saving || (!!userEmail && userEmail !== PRICING_ADMIN)}
+                      title={userEmail !== PRICING_ADMIN ? "Only the pricing admin can push live" : undefined}
+                      className="flex-1 bg-[#E8192C] hover:bg-[#c0141f] disabled:opacity-40"
                     >
                       {saving ? (
                         <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />

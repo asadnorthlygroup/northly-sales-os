@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const cookieStore = await cookies();
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -26,20 +26,40 @@ export async function GET() {
     { auth: { autoRefreshToken: false, persistSession: false } }
   );
 
-  const { data, error } = await admin
+  const url = new URL(request.url);
+  const mine = url.searchParams.get("mine") === "true";
+
+  let query = admin
     .from("proposals")
     .select(`
-      id, version, status, created_at, generated_text, ladder_data, selected_accounts, intake_data,
+      id, version, status, created_at, generated_text, ladder_data, selected_accounts, intake_data, created_by,
       deals (
         id, title, status, cities, goal,
         clients ( company_name, primary_contact_name )
       )
     `)
     .order("created_at", { ascending: false })
-    .limit(100);
+    .limit(200);
+
+  if (mine) query = query.eq("created_by", user.id);
+
+  const { data, error } = await query;
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ data });
+
+  // Attach creator emails
+  const userIds = [...new Set((data ?? []).map((p: { created_by: string }) => p.created_by).filter(Boolean))];
+  const emailMap: Record<string, string> = {};
+  if (userIds.length > 0) {
+    const { data: users } = await admin.auth.admin.listUsers({ perPage: 200 });
+    for (const u of users?.users ?? []) emailMap[u.id] = u.email ?? "";
+  }
+  const enriched = (data ?? []).map((p: Record<string, unknown>) => ({
+    ...p,
+    created_by_email: emailMap[p.created_by as string] ?? "",
+  }));
+
+  return NextResponse.json({ data: enriched });
 }
 
 export async function POST(request: NextRequest) {

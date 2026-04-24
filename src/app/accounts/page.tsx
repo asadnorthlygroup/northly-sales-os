@@ -394,15 +394,27 @@ function AccountRow({ account, live }: { account: AccountSeed; live: LiveMetric 
         </div>
       </td>
       <td className="px-4 py-3 text-right">
-        <div className="inline-flex items-center gap-1.5 justify-end">
-          <span className="font-medium">{formatFollowers(displayFollowers)}</span>
-          {live && delta !== 0 && (
-            <span className={`text-xs font-medium ${delta > 0 ? "text-green-600" : "text-red-500"}`}>
-              {deltaStr}
-            </span>
-          )}
-          {live && (
-            <span className="w-1.5 h-1.5 rounded-full bg-green-400 shrink-0" title="Live data" />
+        <div className="inline-flex flex-col items-end gap-0.5">
+          <div className="inline-flex items-center gap-1.5 justify-end">
+            <span className="font-medium">{formatFollowers(displayFollowers)}</span>
+            {live && delta !== 0 && (
+              <span className={`text-xs font-medium ${delta > 0 ? "text-green-600" : "text-red-500"}`}>
+                {deltaStr}
+              </span>
+            )}
+            {live && (
+              <span className="w-1.5 h-1.5 rounded-full bg-green-400 shrink-0" title="Live data" />
+            )}
+          </div>
+          {(account.facebookFollowers || account.tiktokFollowers) && (
+            <div className="flex gap-1">
+              {account.facebookFollowers && (
+                <span className="text-xs text-blue-600 bg-blue-50 rounded px-1">fb {formatFollowers(account.facebookFollowers)}</span>
+              )}
+              {account.tiktokFollowers && (
+                <span className="text-xs text-slate-700 bg-slate-100 rounded px-1">tt {formatFollowers(account.tiktokFollowers)}</span>
+              )}
+            </div>
           )}
         </div>
       </td>

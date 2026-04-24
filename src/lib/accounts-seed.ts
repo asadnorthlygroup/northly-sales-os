@@ -48,6 +48,8 @@ export interface AccountSeed {
   talkingHeadRate: number; // Talking Head Reel Post
   categories: BusinessCategory[];
   pricingStatus: PricingStatus;
+  facebookFollowers?: number;
+  tiktokFollowers?: number;
 }
 
 function estimateImpressions(followers: number, platform: Platform): number {

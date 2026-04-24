@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
   Sparkles, Users, BarChart3, FileText, UserPlus,
-  Brain, BookOpen, Receipt, DollarSign, Package, Plus,
+  Brain, BookOpen, Receipt, DollarSign, Package, Plus, Award,
 } from "lucide-react";
 import { AppNav } from "@/components/ui/app-nav";
 
@@ -105,6 +105,16 @@ const MODULES = [
     title: "Pricing Engine",
     description: "Live rate calculator with markup controls, ladder previews, and margin tracking",
     cta: "Open Pricing",
+    ctaVariant: "outline" as const,
+  },
+  {
+    href: "/case-studies",
+    icon: Award,
+    iconBg: "bg-emerald-50",
+    iconColor: "text-emerald-600",
+    title: "Case Studies",
+    description: "Upload and reference closed campaign wins — sorted by niche, outcome, and client type",
+    cta: "View Case Studies",
     ctaVariant: "outline" as const,
   },
 ];

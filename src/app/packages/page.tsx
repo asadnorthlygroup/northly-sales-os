@@ -26,6 +26,8 @@ type SalesPackage = {
   guaranteed_impressions: number | null;
   status: "active" | "archived";
   created_at: string;
+  created_by?: string;
+  created_by_email?: string;
 };
 
 const EMPTY_FORM = {
@@ -71,6 +73,7 @@ function PackageCard({
   onDelete: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const creatorHandle = pkg.created_by_email ? pkg.created_by_email.split("@")[0] : null;
 
   return (
     <div className={`border rounded-2xl overflow-hidden ${pkg.status === "archived" ? "opacity-60" : ""}`}>
@@ -88,6 +91,9 @@ function PackageCard({
             <span className="text-sm font-semibold text-slate-700">{formatCurrency(pkg.pricing)}</span>
             {pkg.guaranteed_impressions && (
               <span className="text-xs text-slate-500">{pkg.guaranteed_impressions.toLocaleString()} impr.</span>
+            )}
+            {creatorHandle && (
+              <span className="text-xs text-slate-400 italic">{creatorHandle}</span>
             )}
           </div>
           <div className="flex items-center gap-2 mt-1 flex-wrap">
@@ -435,16 +441,19 @@ export default function PackagesPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"active" | "archived" | "all">("active");
+  const [mineOnly, setMineOnly] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingPkg, setEditingPkg] = useState<SalesPackage | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
-    const res = await fetch(`/api/packages?status=${statusFilter}&q=${encodeURIComponent(search)}`);
+    const params = new URLSearchParams({ status: statusFilter, q: search });
+    if (mineOnly) params.set("mine", "true");
+    const res = await fetch(`/api/packages?${params}`);
     const d = await res.json() as { data: SalesPackage[] };
     setPackages(d.data ?? []);
     setLoading(false);
-  }, [statusFilter, search]);
+  }, [statusFilter, search, mineOnly]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -513,6 +522,19 @@ export default function PackagesPage() {
             <Plus className="h-4 w-4" />
             Create Package
           </Button>
+        </div>
+
+        {/* My / All toggle */}
+        <div className="flex gap-1.5 p-1 bg-slate-100 rounded-xl w-fit">
+          {[{ label: "All Packages", val: false }, { label: "My Packages", val: true }].map(({ label, val }) => (
+            <button
+              key={String(val)}
+              onClick={() => setMineOnly(val)}
+              className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${mineOnly === val ? "bg-white shadow-sm text-slate-900" : "text-slate-500 hover:text-slate-700"}`}
+            >
+              {label}
+            </button>
+          ))}
         </div>
 
         {/* Stats */}

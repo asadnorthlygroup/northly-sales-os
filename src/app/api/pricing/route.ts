@@ -43,9 +43,14 @@ export async function GET() {
 }
 
 // PUT /api/pricing — bulk-update pricing_config values
+const PRICING_ADMIN = "asad@northlygroup.com";
+
 export async function PUT(request: NextRequest) {
   const { data: { session } } = await getSession();
   if (!session) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  if (session.user.email !== PRICING_ADMIN) {
+    return NextResponse.json({ error: "Only the pricing admin can push live changes" }, { status: 403 });
+  }
 
   const updates: Record<string, number> = await request.json();
   const admin = adminClient();
