@@ -58,6 +58,8 @@ function loadGoogleMapsScript(apiKey: string): Promise<void> {
   return _mapsLoadPromise;
 }
 
+type WindowWithGM = typeof window & { gm_authFailure?: () => void };
+
 function usePlacesAutocomplete(
   inputRef: React.RefObject<HTMLInputElement | null>,
   onPlace: (parts: { street: string; city: string; province: string; postal: string }) => void,
@@ -73,38 +75,66 @@ function usePlacesAutocomplete(
 
     ensurePacContainerStyle();
     let cancelled = false;
+    const w = window as WindowWithGM;
+    const prevAuthFailure = w.gm_authFailure;
 
-    loadGoogleMapsScript(apiKey).then(() => {
+    // Intercept Google Maps auth failures (invalid key, Places API not enabled, billing inactive)
+    w.gm_authFailure = () => {
+      if (!cancelled) {
+        onError?.(
+          "Google Maps authentication failed. Go to Google Cloud Console → APIs & Services and confirm: " +
+          "(1) Maps JavaScript API is enabled, (2) Places API is enabled, (3) billing is active for the project."
+        );
+      }
+    };
+
+    loadGoogleMapsScript(apiKey).then(async () => {
       if (cancelled || !inputRef.current) return;
       if (autocompleteRef.current) {
         window.google?.maps?.event?.clearInstanceListeners(autocompleteRef.current);
         autocompleteRef.current = null;
       }
-      const ac = new window.google.maps.places.Autocomplete(inputRef.current, {
-        componentRestrictions: { country: "ca" },
-        fields: ["address_components"],
-        types: ["address"],
-      });
-      autocompleteRef.current = ac;
-      ac.addListener("place_changed", () => {
-        const place = ac.getPlace();
-        if (!place.address_components) return;
-        let streetNumber = "", route = "", city = "", provinceLong = "", postal = "";
-        for (const comp of place.address_components) {
-          const t = comp.types;
-          if (t.includes("street_number")) streetNumber = comp.long_name;
-          else if (t.includes("route")) route = comp.long_name;
-          else if (t.includes("locality")) city = comp.long_name;
-          else if (t.includes("administrative_area_level_1")) provinceLong = comp.long_name;
-          else if (t.includes("postal_code")) postal = comp.long_name;
-        }
-        onPlaceRef.current({
-          street: [streetNumber, route].filter(Boolean).join(" "),
-          city,
-          province: PROVINCE_MAP[provinceLong] ?? "ON",
-          postal,
+
+      try {
+        // Try new importLibrary approach first (required for API keys created after early 2024),
+        // fall back to legacy direct access for older keys.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const mapsAny = window.google.maps as any;
+        const AutocompleteClass: typeof google.maps.places.Autocomplete =
+          typeof mapsAny.importLibrary === "function"
+            ? (await mapsAny.importLibrary("places")).Autocomplete
+            : window.google.maps.places.Autocomplete;
+
+        const ac = new AutocompleteClass(inputRef.current, {
+          componentRestrictions: { country: "ca" },
+          fields: ["address_components"],
+          types: ["address"],
         });
-      });
+        autocompleteRef.current = ac;
+
+        ac.addListener("place_changed", () => {
+          const place = ac.getPlace();
+          if (!place.address_components) return;
+          let streetNumber = "", route = "", city = "", provinceLong = "", postal = "";
+          for (const comp of place.address_components) {
+            const t = comp.types;
+            if (t.includes("street_number")) streetNumber = comp.long_name;
+            else if (t.includes("route")) route = comp.long_name;
+            else if (t.includes("locality")) city = comp.long_name;
+            else if (t.includes("administrative_area_level_1")) provinceLong = comp.long_name;
+            else if (t.includes("postal_code")) postal = comp.long_name;
+          }
+          onPlaceRef.current({
+            street: [streetNumber, route].filter(Boolean).join(" "),
+            city,
+            province: PROVINCE_MAP[provinceLong] ?? "ON",
+            postal,
+          });
+        });
+      } catch (err) {
+        if (!cancelled) onError?.(String(err));
+        console.error("[Places] Autocomplete init error:", err);
+      }
     }).catch((err: Error) => {
       if (!cancelled) onError?.(err.message);
       console.error("[Places]", err.message);
@@ -112,6 +142,7 @@ function usePlacesAutocomplete(
 
     return () => {
       cancelled = true;
+      if (w.gm_authFailure !== prevAuthFailure) w.gm_authFailure = prevAuthFailure;
       if (autocompleteRef.current) {
         window.google?.maps?.event?.clearInstanceListeners(autocompleteRef.current);
         autocompleteRef.current = null;
