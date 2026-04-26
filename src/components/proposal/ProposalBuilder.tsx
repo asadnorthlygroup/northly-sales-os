@@ -321,7 +321,7 @@ export default function ProposalBuilder() {
   // Auto-save form to localStorage on every change (debounced 800ms)
   useEffect(() => {
     const timer = setTimeout(() => {
-      try { localStorage.setItem(DRAFT_KEY, JSON.stringify(form)); } catch { /* ignore */ }
+      try { localStorage.setItem(DRAFT_KEY, JSON.stringify({ ...form, _savedAt: new Date().toISOString() })); } catch { /* ignore */ }
     }, 800);
     return () => clearTimeout(timer);
   }, [form]);

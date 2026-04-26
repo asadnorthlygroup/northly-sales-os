@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { AppNav } from "@/components/ui/app-nav";
-import { Sparkles, FileText, Clock, Search, Copy, Check, ThumbsUp, ThumbsDown, Send, Trophy, ScrollText } from "lucide-react";
+import { Sparkles, FileText, Clock, Search, Copy, Check, ThumbsUp, ThumbsDown, Send, Trophy, ScrollText, PenLine } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { formatCurrency } from "@/lib/pricing";
 import type { LadderPrices } from "@/lib/pricing";
@@ -36,6 +36,17 @@ type Proposal = {
     clients: { company_name: string; primary_contact_name: string | null } | null;
   } | null;
 };
+
+const LOCAL_DRAFT_KEY = "northly_proposal_draft";
+
+function relativeTime(iso: string): string {
+  const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+}
 
 const DEAL_STATUS: Record<string, { label: string; color: string }> = {
   draft:         { label: "Draft",       color: "bg-slate-100 text-slate-600" },
@@ -270,6 +281,8 @@ function ProposalDrawer({
   );
 }
 
+type LocalDraft = { businessName: string; cities: string[]; category: string; _savedAt?: string };
+
 export default function ProposalsPage() {
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [loading, setLoading] = useState(true);
@@ -279,6 +292,7 @@ export default function ProposalsPage() {
   const [selected, setSelected] = useState<Proposal | null>(null);
   const [ioProposal, setIoProposal] = useState<Proposal | null>(null);
   const [feedbackMap, setFeedbackMap] = useState<FeedbackMap>({});
+  const [localDraft, setLocalDraft] = useState<LocalDraft | null>(null);
 
   const loadProposals = useCallback((mine: boolean) => {
     setLoading(true);
@@ -309,6 +323,22 @@ export default function ProposalsPage() {
   }, []);
 
   useEffect(() => { loadProposals(mineOnly); }, [mineOnly, loadProposals]);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(LOCAL_DRAFT_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as Partial<LocalDraft>;
+      if (parsed.businessName || (parsed.cities ?? []).length > 0) {
+        setLocalDraft({
+          businessName: parsed.businessName ?? "",
+          cities: parsed.cities ?? [],
+          category: parsed.category ?? "",
+          _savedAt: parsed._savedAt,
+        });
+      }
+    } catch { /* ignore */ }
+  }, []);
 
   const handleFeedback = useCallback(async (proposalId: string, update: Partial<FeedbackState>) => {
     const current = feedbackMap[proposalId] ?? { status: "draft", rating: 0 };
@@ -426,6 +456,39 @@ export default function ProposalsPage() {
             </Link>
           </Button>
         </div>
+
+        {/* In-progress local draft */}
+        {localDraft && (
+          <div className="flex items-center gap-3 px-4 py-3 rounded-2xl border border-amber-200 bg-amber-50">
+            <div className="h-8 w-8 rounded-lg bg-amber-100 flex items-center justify-center shrink-0">
+              <PenLine className="h-4 w-4 text-amber-600" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="font-semibold text-sm text-amber-900 leading-snug">
+                {localDraft.businessName || "Untitled"} — draft in progress
+              </div>
+              <div className="text-xs text-amber-700 mt-0.5 truncate">
+                {localDraft.cities.length > 0 && `${localDraft.cities.join(", ")} · `}
+                {localDraft.category}
+                {localDraft._savedAt && ` · saved ${relativeTime(localDraft._savedAt)}`}
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <Button asChild size="sm" className="bg-amber-600 hover:bg-amber-700 text-white h-8">
+                <Link href="/proposals/new">Resume</Link>
+              </Button>
+              <button
+                onClick={() => {
+                  try { localStorage.removeItem(LOCAL_DRAFT_KEY); } catch { /* ignore */ }
+                  setLocalDraft(null);
+                }}
+                className="px-3 py-1.5 text-xs text-amber-700 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors"
+              >
+                Discard
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Table */}
         {loading ? (
