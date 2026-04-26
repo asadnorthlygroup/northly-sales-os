@@ -154,6 +154,7 @@ const PROVINCE_TAX: Record<string, { name: string; rate: number }> = {
 };
 
 interface PaymentRow { date: string; amount: string; }
+interface StoryAssignment { handle: string; included: boolean; qty: number; }
 
 interface IOGeneratorModalProps {
   businessName: string;
@@ -221,7 +222,9 @@ export default function IOGeneratorModal({
   const [storyServicesType, setStoryServicesType] = useState<"complementary" | "full_price" | "other">("complementary");
   const [storyServicesNote, setStoryServicesNote] = useState("");
   const [storyRate, setStoryRate] = useState("");
-  const [storyQty, setStoryQty] = useState("1");
+  const [storyAssignments, setStoryAssignments] = useState<StoryAssignment[]>(
+    () => selectedAccounts.map((a) => ({ handle: a.handle, included: true, qty: 1 }))
+  );
   const [paymentType, setPaymentType] = useState<"single" | "multiple">("single");
   const [paymentCount, setPaymentCount] = useState(2);
   const [paymentSchedule, setPaymentSchedule] = useState<PaymentRow[]>([{ date: "", amount: "" }, { date: "", amount: "" }]);
@@ -298,7 +301,9 @@ export default function IOGeneratorModal({
           storyServicesType,
           storyServicesNote,
           storyRate: storyRate ? parseFloat(storyRate.replace(/[^0-9.]/g, "")) : 0,
-          storyQty: parseInt(storyQty) || 1,
+          storyAssignments: storyAssignments
+            .filter((sa) => sa.included)
+            .map((sa) => ({ handle: sa.handle, qty: sa.qty })),
           paymentType,
           paymentSchedule,
           specialConditions,
@@ -477,35 +482,75 @@ export default function IOGeneratorModal({
                     </SelectContent>
                   </Select>
                 </Field>
-                {storyServicesType === "full_price" && (
-                  <div className="grid grid-cols-2 gap-3">
-                    <Field label="Rate per story post">
-                      <Input value={storyRate} onChange={(e) => setStoryRate(e.target.value)} placeholder="$500.00" />
-                    </Field>
-                    <Field label="Quantity">
-                      <Input type="number" min="1" value={storyQty} onChange={(e) => setStoryQty(e.target.value)} placeholder="1" />
-                    </Field>
+
+                {/* Per-account story assignments */}
+                <div>
+                  <Label className="text-sm font-medium text-slate-700 mb-1.5 block">
+                    Which pages & how many stories?
+                  </Label>
+                  <div className="rounded-lg border border-slate-200 overflow-hidden divide-y divide-slate-100">
+                    {storyAssignments.map((sa, i) => (
+                      <div
+                        key={sa.handle}
+                        className={`flex items-center gap-2.5 px-3 py-2 text-sm ${!sa.included ? "bg-slate-50" : ""}`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={sa.included}
+                          onChange={(e) => {
+                            const next = [...storyAssignments];
+                            next[i] = { ...next[i], included: e.target.checked };
+                            setStoryAssignments(next);
+                          }}
+                          className="h-3.5 w-3.5 rounded border-slate-300 accent-[#E8192C] shrink-0"
+                        />
+                        <span className={`flex-1 font-mono text-xs ${!sa.included ? "text-slate-400 line-through" : "text-slate-700"}`}>
+                          {sa.handle}
+                        </span>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const next = [...storyAssignments];
+                              next[i] = { ...next[i], qty: Math.max(1, next[i].qty - 1) };
+                              setStoryAssignments(next);
+                            }}
+                            disabled={!sa.included || sa.qty <= 1}
+                            className="h-5 w-5 rounded border border-slate-200 text-slate-500 hover:bg-slate-100 text-xs flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed"
+                          >−</button>
+                          <span className={`w-5 text-center text-xs tabular-nums font-medium ${!sa.included ? "text-slate-300" : "text-slate-700"}`}>
+                            {sa.qty}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const next = [...storyAssignments];
+                              next[i] = { ...next[i], qty: next[i].qty + 1 };
+                              setStoryAssignments(next);
+                            }}
+                            disabled={!sa.included}
+                            className="h-5 w-5 rounded border border-slate-200 text-slate-500 hover:bg-slate-100 text-xs flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed"
+                          >+</button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
+                </div>
+
+                {(storyServicesType === "full_price" || storyServicesType === "other") && (
+                  <Field label="Rate per story post">
+                    <Input value={storyRate} onChange={(e) => setStoryRate(e.target.value)} placeholder="$500.00" />
+                  </Field>
                 )}
                 {storyServicesType === "other" && (
-                  <>
-                    <div className="grid grid-cols-2 gap-3">
-                      <Field label="Rate per story post">
-                        <Input value={storyRate} onChange={(e) => setStoryRate(e.target.value)} placeholder="$500.00" />
-                      </Field>
-                      <Field label="Quantity">
-                        <Input type="number" min="1" value={storyQty} onChange={(e) => setStoryQty(e.target.value)} placeholder="1" />
-                      </Field>
-                    </div>
-                    <Field label="Describe the story arrangement">
-                      <Textarea
-                        value={storyServicesNote}
-                        onChange={(e) => setStoryServicesNote(e.target.value)}
-                        placeholder="e.g. 1 complimentary story on the main account, full price on supporting accounts…"
-                        rows={3}
-                      />
-                    </Field>
-                  </>
+                  <Field label="Describe the story arrangement">
+                    <Textarea
+                      value={storyServicesNote}
+                      onChange={(e) => setStoryServicesNote(e.target.value)}
+                      placeholder="e.g. 1 complementary story on the main account, full price on supporting accounts…"
+                      rows={3}
+                    />
+                  </Field>
                 )}
               </div>
 

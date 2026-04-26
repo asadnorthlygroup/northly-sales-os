@@ -146,7 +146,7 @@ export async function POST(request: NextRequest) {
     storyServicesType,
     storyServicesNote,
     storyRate,
-    storyQty,
+    storyAssignments,
     paymentType,
     paymentSchedule,
     specialConditions,
@@ -170,7 +170,7 @@ export async function POST(request: NextRequest) {
     storyServicesType: string;
     storyServicesNote: string;
     storyRate: number;
-    storyQty: number;
+    storyAssignments: Array<{ handle: string; qty: number }>;
     paymentType: string;
     paymentSchedule: Array<{ date: string; amount: string }>;
     specialConditions: string;
@@ -223,17 +223,27 @@ export async function POST(request: NextRequest) {
     marketsText = Array.isArray(markets) ? markets.join(", ") : "";
   }
 
+  const assignments = Array.isArray(storyAssignments) && storyAssignments.length > 0
+    ? storyAssignments
+    : selectedAccountHandles.map((h) => ({ handle: h, qty: 1 }));
+
+  const assignmentLines = assignments
+    .map((a) => `• ${a.handle}: ${a.qty} story slide${a.qty !== 1 ? "s" : ""}`)
+    .join("\n");
+
   let storyText = "";
   if (storyServicesType === "complementary") {
-    storyText = `Story slides included as complementary support posts on ${selectedAccountHandles.join(", ")}.`;
+    storyText = `Story slides included as complementary support posts:\n${assignmentLines}`;
   } else if (storyServicesType === "full_price") {
-    storyText = "Story slides billed as standalone deliverables at standard story rate.";
+    storyText = `Story slides billed as standalone deliverables:\n${assignmentLines}`;
   } else {
-    storyText = storyServicesNote || "Story services as per agreement.";
+    storyText = storyServicesNote
+      ? `${storyServicesNote}\n\n${assignmentLines}`
+      : `Story services as per agreement:\n${assignmentLines}`;
   }
 
   const storyRateVal = storyServicesType === "complementary" ? 0 : (storyRate || 0);
-  const storyQtyVal = storyQty || 1;
+  const storyQtyVal = assignments.reduce((s, a) => s + a.qty, 0);
   const storyFee = storyRateVal * storyQtyVal;
   const storyLabel = storyServicesType === "complementary" ? "Story Services (Complimentary)" : "Story Services";
 
