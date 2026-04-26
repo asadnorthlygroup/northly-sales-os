@@ -21,7 +21,6 @@ const PROVINCE_MAP: Record<string, string> = {
   "Prince Edward Island": "PE", "Quebec": "QC", "Saskatchewan": "SK", "Yukon": "YT",
 };
 
-// Inject a global style so the pac-container floats above the modal z-stack
 function ensurePacContainerStyle() {
   if (document.getElementById("pac-container-fix")) return;
   const style = document.createElement("style");
@@ -30,9 +29,39 @@ function ensurePacContainerStyle() {
   document.head.appendChild(style);
 }
 
+// Module-level promise so concurrent callers share a single load
+let _mapsLoadPromise: Promise<void> | null = null;
+
+function loadGoogleMapsScript(apiKey: string): Promise<void> {
+  if (window.google?.maps?.places) return Promise.resolve();
+  if (_mapsLoadPromise) return _mapsLoadPromise;
+
+  _mapsLoadPromise = new Promise<void>((resolve, reject) => {
+    const existing = document.getElementById("google-maps-places") as HTMLScriptElement | null;
+    if (existing) {
+      existing.addEventListener("load", () => resolve());
+      existing.addEventListener("error", () => reject(new Error("Google Maps script failed to load")));
+      return;
+    }
+    const script = document.createElement("script");
+    script.id = "google-maps-places";
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () => {
+      _mapsLoadPromise = null;
+      reject(new Error("Google Maps script failed to load — check that the API key is valid and Places API is enabled in Google Cloud Console"));
+    };
+    document.head.appendChild(script);
+  });
+
+  return _mapsLoadPromise;
+}
+
 function usePlacesAutocomplete(
   inputRef: React.RefObject<HTMLInputElement | null>,
-  onPlace: (parts: { street: string; city: string; province: string; postal: string }) => void
+  onPlace: (parts: { street: string; city: string; province: string; postal: string }) => void,
+  onError?: (msg: string) => void,
 ) {
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
   const onPlaceRef = useRef(onPlace);
@@ -40,14 +69,13 @@ function usePlacesAutocomplete(
 
   useEffect(() => {
     const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-    if (!apiKey) return;
+    if (!apiKey || !inputRef.current) return;
 
     ensurePacContainerStyle();
+    let cancelled = false;
 
-    const scriptId = "google-maps-places";
-
-    function initAutocomplete() {
-      if (!inputRef.current) return;
+    loadGoogleMapsScript(apiKey).then(() => {
+      if (cancelled || !inputRef.current) return;
       if (autocompleteRef.current) {
         window.google?.maps?.event?.clearInstanceListeners(autocompleteRef.current);
         autocompleteRef.current = null;
@@ -61,7 +89,6 @@ function usePlacesAutocomplete(
       ac.addListener("place_changed", () => {
         const place = ac.getPlace();
         if (!place.address_components) return;
-
         let streetNumber = "", route = "", city = "", provinceLong = "", postal = "";
         for (const comp of place.address_components) {
           const t = comp.types;
@@ -71,7 +98,6 @@ function usePlacesAutocomplete(
           else if (t.includes("administrative_area_level_1")) provinceLong = comp.long_name;
           else if (t.includes("postal_code")) postal = comp.long_name;
         }
-
         onPlaceRef.current({
           street: [streetNumber, route].filter(Boolean).join(" "),
           city,
@@ -79,29 +105,13 @@ function usePlacesAutocomplete(
           postal,
         });
       });
-    }
-
-    // Give the input a moment to mount, then attach
-    const timer = setTimeout(() => {
-      if (!document.getElementById(scriptId)) {
-        const script = document.createElement("script");
-        script.id = scriptId;
-        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
-        script.async = true;
-        document.head.appendChild(script);
-        script.onload = initAutocomplete;
-      } else if (window.google?.maps?.places) {
-        initAutocomplete();
-      } else {
-        const existing = document.getElementById(scriptId) as HTMLScriptElement;
-        const handler = () => initAutocomplete();
-        existing.addEventListener("load", handler);
-        return () => existing.removeEventListener("load", handler);
-      }
-    }, 100);
+    }).catch((err: Error) => {
+      if (!cancelled) onError?.(err.message);
+      console.error("[Places]", err.message);
+    });
 
     return () => {
-      clearTimeout(timer);
+      cancelled = true;
       if (autocompleteRef.current) {
         window.google?.maps?.event?.clearInstanceListeners(autocompleteRef.current);
         autocompleteRef.current = null;
@@ -194,6 +204,8 @@ export default function IOGeneratorModal({
   const streetInputRef = useRef<HTMLInputElement>(null);
   const hasPlacesKey = !!process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
 
+  const [placesError, setPlacesError] = useState<string | null>(null);
+
   const handlePlaceSelect = useCallback((parts: { street: string; city: string; province: string; postal: string }) => {
     if (parts.street) setClientStreet(parts.street);
     if (parts.city) setClientCity(parts.city);
@@ -201,7 +213,7 @@ export default function IOGeneratorModal({
     if (parts.postal) setClientPostal(parts.postal);
   }, []);
 
-  usePlacesAutocomplete(streetInputRef, handlePlaceSelect);
+  usePlacesAutocomplete(streetInputRef, handlePlaceSelect, setPlacesError);
   const [clientEmail, setClientEmail] = useState("");
   const [serviceStartDate, setServiceStartDate] = useState("");
   const [campaignEndDate, setCampaignEndDate] = useState("");
@@ -406,8 +418,11 @@ export default function IOGeneratorModal({
                       <MapPin className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
                     )}
                   </div>
-                  {hasPlacesKey && (
+                  {hasPlacesKey && !placesError && (
                     <p className="text-xs text-slate-400 mt-1">Start typing — city, province, and postal will fill automatically.</p>
+                  )}
+                  {placesError && (
+                    <p className="text-xs text-amber-600 mt-1">Address autocomplete unavailable — fill in manually. ({placesError})</p>
                   )}
                 </Field>
                 <div className="grid grid-cols-2 gap-3">
