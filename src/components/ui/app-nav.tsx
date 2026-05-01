@@ -22,6 +22,7 @@ const PRIMARY_NAV = [
 ];
 
 const MORE_NAV = [
+  { href: "/quick-io", label: "Quick IO" },
   { href: "/library", label: "Proposal Library" },
   { href: "/packages", label: "Packages" },
   { href: "/case-studies", label: "Case Studies" },

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
   Sparkles, Users, BarChart3, FileText, UserPlus,
-  Brain, BookOpen, Receipt, DollarSign, Package, Plus, Award,
+  Brain, BookOpen, Receipt, DollarSign, Package, Plus, Award, Zap,
 } from "lucide-react";
 import { AppNav } from "@/components/ui/app-nav";
 
@@ -16,6 +16,16 @@ const MODULES = [
     description: "5-option ladder with live pricing, strategy hooks, and AI-powered drafts",
     cta: "New Proposal",
     ctaVariant: "primary" as const,
+  },
+  {
+    href: "/quick-io",
+    icon: Zap,
+    iconBg: "bg-amber-50",
+    iconColor: "text-amber-600",
+    title: "Quick IO",
+    description: "Skip the proposal — pick pages, set pricing, and generate IO + Invoice docs",
+    cta: "Open Quick IO",
+    ctaVariant: "outline" as const,
   },
   {
     href: "/proposals",

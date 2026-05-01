@@ -33,7 +33,7 @@ const OPTION_LABELS: Record<number, string> = {
 };
 
 interface InvoiceModalProps {
-  dealId: string;
+  dealId?: string;
   clientName: string;
   optionPrices: Record<string, number>;
   selectedAccountHandles: string[];

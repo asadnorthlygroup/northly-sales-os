@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { AppNav } from "@/components/ui/app-nav";
 import IOGeneratorModal from "@/components/proposal/IOGeneratorModal";
+import InvoiceModal from "@/components/deals/InvoiceModal";
 import {
   CATEGORY_OPTIONS,
   GOAL_OPTIONS,
@@ -133,6 +134,7 @@ const DEFAULT_FORM: ProposalForm = {
 
 const STEPS = ["Business", "Strategy", "Pages & Pricing", "Output"] as const;
 const DRAFT_KEY = "northly_proposal_draft";
+const QUICK_DRAFT_KEY = "northly_quick_io_draft";
 
 // ─────────────────────────────────────────────
 // Voice recording hook
@@ -223,7 +225,10 @@ function AIBtn({ loading, onClick, label = "AI Fill" }: {
 // ─────────────────────────────────────────────
 // Main component
 // ─────────────────────────────────────────────
-export default function ProposalBuilder() {
+export default function ProposalBuilder({ mode = "full" }: { mode?: "full" | "quick" } = {}) {
+  const isQuick = mode === "quick";
+  const draftKey = isQuick ? QUICK_DRAFT_KEY : DRAFT_KEY;
+  const initialStep = isQuick ? 3 : 1;
   const searchParams = useSearchParams();
   const [draftRestored, setDraftRestored] = useState(false);
   const [form, setForm] = useState<ProposalForm>(() => {
@@ -234,7 +239,7 @@ export default function ProposalBuilder() {
 
     if (!hasUrlParams) {
       try {
-        const saved = typeof window !== "undefined" ? localStorage.getItem(DRAFT_KEY) : null;
+        const saved = typeof window !== "undefined" ? localStorage.getItem(draftKey) : null;
         if (saved) {
           const parsed = JSON.parse(saved) as Partial<ProposalForm>;
           return { ...DEFAULT_FORM, ...parsed };
@@ -273,7 +278,8 @@ export default function ProposalBuilder() {
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [closeLeadId] = useState<string | null>(() => searchParams.get("closeLeadId"));
   const [packages, setPackages] = useState<PackageRecord[]>([]);
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(initialStep);
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savedDealId, setSavedDealId] = useState<string | null>(null);
   const [savedProposalId, setSavedProposalId] = useState<string | null>(null);
@@ -307,7 +313,7 @@ export default function ProposalBuilder() {
     });
 
     // Show toast if we restored a draft
-    const hasSaved = typeof window !== "undefined" && !!localStorage.getItem(DRAFT_KEY);
+    const hasSaved = typeof window !== "undefined" && !!localStorage.getItem(draftKey);
     const hasUrlParams = !!(
       searchParams.get("businessName") || searchParams.get("company") ||
       searchParams.get("closeLeadId") || searchParams.get("packageId")
@@ -321,7 +327,7 @@ export default function ProposalBuilder() {
   // Auto-save form to localStorage on every change (debounced 800ms)
   useEffect(() => {
     const timer = setTimeout(() => {
-      try { localStorage.setItem(DRAFT_KEY, JSON.stringify({ ...form, _savedAt: new Date().toISOString() })); } catch { /* ignore */ }
+      try { localStorage.setItem(draftKey, JSON.stringify({ ...form, _savedAt: new Date().toISOString() })); } catch { /* ignore */ }
     }, 800);
     return () => clearTimeout(timer);
   }, [form]);
@@ -536,7 +542,7 @@ export default function ProposalBuilder() {
       if (!res.ok) throw new Error(data.error ?? "Save failed");
       setSavedDealId(data.dealId);
       setSavedProposalId(data.proposalId);
-      try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
+      try { localStorage.removeItem(draftKey); } catch { /* ignore */ }
       setDraftRestored(false);
       toast({ title: "Proposal saved!", description: "Added to your Deals Pipeline." });
     } catch (err) {
@@ -548,14 +554,23 @@ export default function ProposalBuilder() {
 
   return (
     <>
-      <AppNav page="Proposal Builder" showBack backHref="/deals" />
+      <AppNav
+        page={isQuick ? "Quick IO" : "Proposal Builder"}
+        showBack
+        backHref={isQuick ? "/" : "/deals"}
+      />
       <div className="min-h-screen bg-slate-50 p-4 lg:p-6">
       <div className="mx-auto max-w-7xl">
         <div className="mb-6">
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <Sparkles className="h-6 w-6 text-[#E8192C]" />
-            Proposal Builder
+            {isQuick ? "Quick IO" : "Proposal Builder"}
           </h1>
+          {isQuick && (
+            <p className="text-sm text-slate-500 mt-1">
+              Skip the proposal — pick pages, set pricing, and generate IO + Invoice docs.
+            </p>
+          )}
         </div>
 
         <div className="grid gap-6 lg:grid-cols-[260px_1fr]">
@@ -567,8 +582,11 @@ export default function ProposalBuilder() {
             <CardContent className="space-y-2">
               {STEPS.map((title, idx) => {
                 const n = idx + 1;
+                if (isQuick && n < 3) return null;
                 const active = step === n;
                 const done = step > n;
+                const displayN = isQuick ? n - 2 : n;
+                const displayTitle = isQuick && n === 4 ? "Generate IO" : title;
                 return (
                   <button
                     key={title}
@@ -581,11 +599,11 @@ export default function ProposalBuilder() {
                   >
                     <div className="flex items-center gap-2">
                       <div className={`h-5 w-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${active ? "bg-white text-[#E8192C]" : done ? "bg-white/20" : "bg-slate-100 text-slate-500"}`}>
-                        {done ? <Check className="h-3 w-3" /> : n}
+                        {done ? <Check className="h-3 w-3" /> : displayN}
                       </div>
                       <div>
-                        <div className="text-xs opacity-70">Step {n}</div>
-                        <div className="font-medium text-sm">{title}</div>
+                        <div className="text-xs opacity-70">Step {displayN}</div>
+                        <div className="font-medium text-sm">{displayTitle}</div>
                       </div>
                     </div>
                   </button>
@@ -619,7 +637,7 @@ export default function ProposalBuilder() {
                   className="ml-auto text-amber-600 hover:text-amber-900 underline text-xs font-medium"
                   onClick={() => {
                     setForm(DEFAULT_FORM);
-                    try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
+                    try { localStorage.removeItem(draftKey); } catch { /* ignore */ }
                     setDraftRestored(false);
                   }}
                 >
@@ -644,6 +662,9 @@ export default function ProposalBuilder() {
             )}
             {step === 1 && <Step1Business form={form} setForm={setForm} strategyHook={strategyHook} packages={packages} onApplyPackage={applyPackage} />}
             {step === 2 && <Step2Strategy form={form} setForm={setForm} strategyHook={strategyHook} userEmail={userEmail} />}
+            {step === 3 && isQuick && (
+              <QuickClientSetup form={form} setForm={setForm} />
+            )}
             {step === 3 && (
               <Step3Pages
                 form={form}
@@ -681,14 +702,16 @@ export default function ProposalBuilder() {
                 isReviewing={isReviewing}
                 reviewProgress={reviewProgress}
                 onGenerateIO={() => setShowIOModal(true)}
+                isQuick={isQuick}
+                onCreateInvoice={() => setShowInvoiceModal(true)}
               />
             )}
 
             <div className="flex justify-between pt-2">
               <Button
                 variant="outline"
-                disabled={step === 1}
-                onClick={() => setStep((s) => Math.max(1, s - 1))}
+                disabled={step === initialStep}
+                onClick={() => setStep((s) => Math.max(initialStep, s - 1))}
               >
                 <ChevronLeft className="h-4 w-4 mr-1" />
                 Back
@@ -697,7 +720,7 @@ export default function ProposalBuilder() {
                 onClick={async () => {
                   const next = Math.min(4, step + 1);
                   setStep(next);
-                  if (next === 4) {
+                  if (next === 4 && !isQuick) {
                     setReviewIssues([]);
                     setReviewProgress(0);
                     setIsReviewing(true);
@@ -749,6 +772,20 @@ export default function ProposalBuilder() {
         optionsCount={form.optionsCount}
         collaboratorHandles={form.collaboratorHandles}
         onClose={() => setShowIOModal(false)}
+      />
+    )}
+    {showInvoiceModal && (
+      <InvoiceModal
+        dealId={savedDealId ?? undefined}
+        clientName={form.businessName || "Client"}
+        optionPrices={{
+          option2Price: ladder.option2Price,
+          option3Price: ladder.option3Price,
+          option4Price: ladder.option4Price,
+          option5Price: ladder.option5Price,
+        }}
+        selectedAccountHandles={selectedAccounts.map((a) => a.handle)}
+        onClose={() => setShowInvoiceModal(false)}
       />
     )}
     </>
@@ -1685,6 +1722,84 @@ function Step3Pages({
 }
 
 // ─────────────────────────────────────────────
+// QUICK CLIENT SETUP — used in Quick IO mode
+// ─────────────────────────────────────────────
+function QuickClientSetup({
+  form,
+  setForm,
+}: {
+  form: ProposalForm;
+  setForm: React.Dispatch<React.SetStateAction<ProposalForm>>;
+}) {
+  const update = (key: keyof ProposalForm, value: unknown) =>
+    setForm((f) => ({ ...f, [key]: value }));
+
+  const toggleCity = (key: string) => {
+    const next = form.cities.includes(key)
+      ? form.cities.filter((c) => c !== key)
+      : [...form.cities, key];
+    update("cities", next.length ? next : [key]);
+  };
+
+  return (
+    <Card className="rounded-2xl shadow-sm border-slate-200">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base flex items-center gap-2">
+          <Users className="h-4 w-4 text-[#E8192C]" />
+          Client Setup
+        </CardTitle>
+        <CardDescription>Just the basics — needed to filter pages and fill the IO doc.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="grid gap-3 md:grid-cols-2">
+          <div>
+            <Label className="text-xs text-slate-600 mb-1.5 block">Business name</Label>
+            <Input
+              value={form.businessName}
+              onChange={(e) => update("businessName", e.target.value)}
+              placeholder="e.g. Burgers & Co"
+            />
+          </div>
+          <div>
+            <Label className="text-xs text-slate-600 mb-1.5 block">Business category</Label>
+            <Select value={form.category} onValueChange={(v) => update("category", v as BusinessCategory)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {CATEGORY_OPTIONS.map((c) => (
+                  <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <div>
+          <Label className="text-xs text-slate-600 mb-1.5 block">Markets</Label>
+          <div className="flex flex-wrap gap-1.5">
+            {CITY_GROUPS.map((g) => {
+              const active = form.cities.includes(g.key);
+              return (
+                <button
+                  key={g.key}
+                  type="button"
+                  onClick={() => toggleCity(g.key)}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all ${
+                    active
+                      ? "bg-[#E8192C] text-white border-[#E8192C]"
+                      : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                  }`}
+                >
+                  {g.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─────────────────────────────────────────────
 // STEP 4 — Output
 // ─────────────────────────────────────────────
 function Step4Output({
@@ -1710,6 +1825,8 @@ function Step4Output({
   isReviewing,
   reviewProgress,
   onGenerateIO,
+  isQuick = false,
+  onCreateInvoice,
 }: {
   proposalText: string;
   proposalHTML: string;
@@ -1733,6 +1850,8 @@ function Step4Output({
   isReviewing: boolean;
   reviewProgress: number;
   onGenerateIO: () => void;
+  isQuick?: boolean;
+  onCreateInvoice?: () => void;
 }) {
   const [chatInput, setChatInput] = useState("");
   const [chatHistory, setChatHistory] = useState<{ role: "user" | "ai"; text: string }[]>([]);
@@ -1750,47 +1869,65 @@ function Step4Output({
     <div className="space-y-4">
       <Card className="rounded-2xl shadow-sm">
         <CardHeader>
-          <CardTitle>Step 4: Proposal Output</CardTitle>
-          <CardDescription>Polished proposal ready to copy and paste into Gmail.</CardDescription>
+          <CardTitle>{isQuick ? "Generate Documents" : "Step 4: Proposal Output"}</CardTitle>
+          <CardDescription>
+            {isQuick
+              ? "Review pricing, then generate the IO and Invoice."
+              : "Polished proposal ready to copy and paste into Gmail."}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {/* Action bar — always visible regardless of active tab */}
           <div className="flex flex-wrap items-center mb-4 gap-2">
-            {isRefined && (
+            {!isQuick && isRefined && (
               <button onClick={onResetRefined} className="text-xs text-slate-500 underline hover:text-slate-700">
                 Reset to generated
               </button>
             )}
             <div className="ml-auto flex flex-wrap gap-2">
-              <Button variant="outline" onClick={onCopy} size="sm">
-                <Copy className="h-4 w-4 mr-2" />Copy
-              </Button>
-              {docUrl ? (
-                <Button size="sm" variant="outline" onClick={() => window.open(docUrl, "_blank")}>
-                  <ExternalLink className="h-4 w-4 mr-2" />Open Doc
-                </Button>
-              ) : (
-                <Button size="sm" variant="outline" onClick={onExportDoc} disabled={exportingDoc}>
-                  {exportingDoc ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileText className="h-4 w-4 mr-2" />}
-                  {exportingDoc ? "Exporting…" : "Export to Doc"}
-                </Button>
+              {!isQuick && (
+                <>
+                  <Button variant="outline" onClick={onCopy} size="sm">
+                    <Copy className="h-4 w-4 mr-2" />Copy
+                  </Button>
+                  {docUrl ? (
+                    <Button size="sm" variant="outline" onClick={() => window.open(docUrl, "_blank")}>
+                      <ExternalLink className="h-4 w-4 mr-2" />Open Doc
+                    </Button>
+                  ) : (
+                    <Button size="sm" variant="outline" onClick={onExportDoc} disabled={exportingDoc}>
+                      {exportingDoc ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileText className="h-4 w-4 mr-2" />}
+                      {exportingDoc ? "Exporting…" : "Export to Doc"}
+                    </Button>
+                  )}
+                </>
               )}
               <Button size="sm" variant="outline" onClick={onGenerateIO} className="border-[#E8192C] text-[#E8192C] hover:bg-red-50">
                 <FileText className="h-4 w-4 mr-2" />Generate IO
               </Button>
-              {savedDealId ? (
-                <Button size="sm" onClick={onViewPipeline} className="bg-green-600 hover:bg-green-700">
-                  <Check className="h-4 w-4 mr-2" />View in Pipeline
+              {isQuick && onCreateInvoice && (
+                <Button size="sm" variant="outline" onClick={onCreateInvoice} className="border-emerald-500 text-emerald-700 hover:bg-emerald-50">
+                  <FileText className="h-4 w-4 mr-2" />Create Invoice
                 </Button>
-              ) : (
-                <Button size="sm" onClick={onSave} disabled={saving} className="bg-[#E8192C] hover:bg-[#c0141f]">
-                  {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-                  {saving ? "Saving…" : "Save to Pipeline"}
-                </Button>
+              )}
+              {!isQuick && (
+                savedDealId ? (
+                  <Button size="sm" onClick={onViewPipeline} className="bg-green-600 hover:bg-green-700">
+                    <Check className="h-4 w-4 mr-2" />View in Pipeline
+                  </Button>
+                ) : (
+                  <Button size="sm" onClick={onSave} disabled={saving} className="bg-[#E8192C] hover:bg-[#c0141f]">
+                    {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                    {saving ? "Saving…" : "Save to Pipeline"}
+                  </Button>
+                )
               )}
             </div>
           </div>
 
+          {isQuick ? (
+            <QuickPricingSummary form={form} ladder={ladder} selectedAccounts={selectedAccounts} priceOf={priceOf} />
+          ) : (
           <Tabs defaultValue="email" className="w-full">
             <TabsList className="mb-4">
               <TabsTrigger value="email"><Mail className="h-4 w-4 mr-2" />Proposal Email</TabsTrigger>
@@ -1873,9 +2010,12 @@ function Step4Output({
               </div>
             </TabsContent>
           </Tabs>
+          )}
         </CardContent>
       </Card>
 
+      {/* AI Proposal Assistant — hidden in quick mode */}
+      {!isQuick && (<>
       {/* AI Proposal Assistant */}
       <Card className="rounded-2xl shadow-sm border-purple-100">
         <CardHeader className="pb-3">
@@ -1946,6 +2086,58 @@ function Step4Output({
           </div>
         </CardContent>
       </Card>
+      </>)}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// Quick Pricing Summary (used in Quick IO mode)
+// ─────────────────────────────────────────────
+function QuickPricingSummary({
+  form,
+  ladder,
+  selectedAccounts,
+  priceOf,
+}: {
+  form: ProposalForm;
+  ladder: ReturnType<typeof computeLadderPrices>;
+  selectedAccounts: AccountSeed[];
+  priceOf: (a: AccountSeed) => number;
+}) {
+  return (
+    <div className="space-y-4">
+      <div>
+        <h3 className="font-medium text-sm mb-2">Selected Pages ({selectedAccounts.length})</h3>
+        <div className="space-y-1">
+          {selectedAccounts.map((a) => (
+            <div key={a.handle} className="flex justify-between text-sm py-1 border-b">
+              <span>{a.handle}</span>
+              <span className="font-medium">{formatCurrency(priceOf(a))}</span>
+            </div>
+          ))}
+          <div className="flex justify-between text-sm font-bold pt-1">
+            <span>Total (standard)</span>
+            <span>{formatCurrency(ladder.option2StandardValue)}</span>
+          </div>
+        </div>
+      </div>
+      <div>
+        <h3 className="font-medium text-sm mb-2">Option Prices</h3>
+        <div className="space-y-1">
+          {[
+            { label: "Option 2 — Awareness Pilot", price: ladder.option2Price },
+            { label: "Option 3 — Awareness Bundle", price: ladder.option3Price },
+            { label: "Option 4 — Awareness + Conversion", price: ladder.option4Price },
+            { label: "Option 5 — Full Campaign", price: ladder.option5Price },
+          ].slice(0, form.optionsCount - 1).map(({ label, price }) => (
+            <div key={label} className="flex justify-between text-sm py-1 border-b">
+              <span>{label}</span>
+              <span className="font-bold">{formatCurrency(price)}</span>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
