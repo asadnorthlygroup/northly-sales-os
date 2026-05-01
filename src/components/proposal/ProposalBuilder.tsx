@@ -450,13 +450,14 @@ export default function ProposalBuilder({ mode = "full" }: { mode?: "full" | "qu
 
   // In Quick IO mode: a single discount applied to the full subtotal drives
   // a flat "ladder" with all option prices set to the same final value.
+  // Skips $50 rounding so the IO reflects the exact discounted total shown in step 2.
   const effectiveLadder = useMemo(() => {
     if (!isQuick) return ladder;
     const subtotal = selectedBaseTotal;
     const discountAmount = form.quickDiscountMode === "percent"
       ? subtotal * (form.quickDiscountValue / 100)
       : form.quickDiscountValue;
-    const finalPrice = roundProposalPrice(Math.max(0, subtotal - discountAmount));
+    const finalPrice = Math.max(0, subtotal - discountAmount);
     return {
       ...ladder,
       option2Price: finalPrice,
