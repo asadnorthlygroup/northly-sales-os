@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { X, Receipt, ExternalLink, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/pricing";
+import { loadBillingCache, saveBillingCache } from "@/lib/billing-cache";
 
 const PROVINCE_TAX: Record<string, { name: string; rate: number }> = {
   ON: { name: "HST (ON)", rate: 0.13 },
@@ -38,6 +39,7 @@ interface InvoiceModalProps {
   optionPrices: Record<string, number>;
   selectedAccountHandles: string[];
   onClose: () => void;
+  isQuick?: boolean;
 }
 
 export default function InvoiceModal({
@@ -46,6 +48,7 @@ export default function InvoiceModal({
   optionPrices,
   selectedAccountHandles,
   onClose,
+  isQuick = false,
 }: InvoiceModalProps) {
   const today = new Date().toISOString().slice(0, 10);
 
@@ -54,17 +57,31 @@ export default function InvoiceModal({
   );
   const defaultOption = availableOptions[0] ?? 2;
 
-  const [form, setForm] = useState({
-    clientEmail: "",
-    clientStreet: "",
-    clientCity: "",
-    clientProvince: "ON",
-    clientPostal: "",
-    optionNumber: defaultOption,
-    serviceDescription: "",
-    invoiceDate: today,
-    dueDate: today,
+  const [form, setForm] = useState(() => {
+    const cache = loadBillingCache();
+    return {
+      clientEmail: cache.email,
+      clientStreet: cache.street,
+      clientCity: cache.city,
+      clientProvince: cache.province || "ON",
+      clientPostal: cache.postal,
+      optionNumber: defaultOption,
+      serviceDescription: "",
+      invoiceDate: today,
+      dueDate: today,
+    };
   });
+
+  // Persist billing fields so the IO modal (or next session) can pre-fill them too.
+  useEffect(() => {
+    saveBillingCache({
+      email: form.clientEmail,
+      street: form.clientStreet,
+      city: form.clientCity,
+      province: form.clientProvince,
+      postal: form.clientPostal,
+    });
+  }, [form.clientEmail, form.clientStreet, form.clientCity, form.clientProvince, form.clientPostal]);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -177,21 +194,28 @@ export default function InvoiceModal({
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="text-sm font-medium text-slate-700">Client: <span className="text-slate-900">{clientName}</span></div>
 
-              {/* Option */}
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Pricing Option</label>
-                <select
-                  value={form.optionNumber}
-                  onChange={(e) => set("optionNumber", Number(e.target.value))}
-                  className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#E8192C]/30"
-                >
-                  {availableOptions.map((n) => (
-                    <option key={n} value={n}>
-                      {OPTION_LABELS[n]} — {formatCurrency(optionPrices[`option${n}Price`] ?? 0)}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {/* Option — hidden in Quick mode (single Marketing Package price) */}
+              {isQuick ? (
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 flex items-center justify-between text-sm">
+                  <span className="text-slate-700">Marketing Package</span>
+                  <span className="font-semibold text-slate-900">{formatCurrency(optionPrices[`option${form.optionNumber}Price`] ?? 0)}</span>
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Pricing Option</label>
+                  <select
+                    value={form.optionNumber}
+                    onChange={(e) => set("optionNumber", Number(e.target.value))}
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#E8192C]/30"
+                  >
+                    {availableOptions.map((n) => (
+                      <option key={n} value={n}>
+                        {OPTION_LABELS[n]} — {formatCurrency(optionPrices[`option${n}Price`] ?? 0)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               {/* Service description */}
               <div>
@@ -200,7 +224,9 @@ export default function InvoiceModal({
                   value={form.serviceDescription}
                   onChange={(e) => set("serviceDescription", e.target.value)}
                   rows={3}
-                  placeholder={`Northly Group Marketing Package — ${OPTION_LABELS[form.optionNumber]}`}
+                  placeholder={isQuick
+                    ? "Northly Group Marketing Package"
+                    : `Northly Group Marketing Package — ${OPTION_LABELS[form.optionNumber]}`}
                   className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#E8192C]/30 resize-none"
                 />
               </div>

@@ -12,6 +12,7 @@ import { Loader2, FileText, ExternalLink, MapPin } from "lucide-react";
 import { formatCurrency } from "@/lib/pricing";
 import type { AccountSeed } from "@/lib/accounts-seed";
 import type { LadderPrices } from "@/lib/pricing";
+import { loadBillingCache, saveBillingCache } from "@/lib/billing-cache";
 
 // ─── Google Places autocomplete hook ──────────────────────────────────────────
 const PROVINCE_MAP: Record<string, string> = {
@@ -233,12 +234,12 @@ export default function IOGeneratorModal({
   initialStoryType,
 }: IOGeneratorModalProps) {
   const [optionNumber, setOptionNumber] = useState<number>(Math.min(optionsCount, 2));
-  const [contactName, setContactName] = useState("");
-  const [clientLegalName, setClientLegalName] = useState(businessName);
-  const [clientStreet, setClientStreet] = useState("");
-  const [clientCity, setClientCity] = useState("");
-  const [clientProvince, setClientProvince] = useState("ON");
-  const [clientPostal, setClientPostal] = useState("");
+  const [contactName, setContactName] = useState(() => loadBillingCache().contactName);
+  const [clientLegalName, setClientLegalName] = useState(() => loadBillingCache().legalName || businessName);
+  const [clientStreet, setClientStreet] = useState(() => loadBillingCache().street);
+  const [clientCity, setClientCity] = useState(() => loadBillingCache().city);
+  const [clientProvince, setClientProvince] = useState(() => loadBillingCache().province || "ON");
+  const [clientPostal, setClientPostal] = useState(() => loadBillingCache().postal);
   const streetInputRef = useRef<HTMLInputElement>(null);
   const hasPlacesKey = !!process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
 
@@ -252,7 +253,20 @@ export default function IOGeneratorModal({
   }, []);
 
   usePlacesAutocomplete(streetInputRef, handlePlaceSelect, setPlacesError);
-  const [clientEmail, setClientEmail] = useState("");
+  const [clientEmail, setClientEmail] = useState(() => loadBillingCache().email);
+
+  // Persist billing details so they pre-fill the Invoice modal (and next session's IO modal).
+  useEffect(() => {
+    saveBillingCache({
+      contactName,
+      legalName: clientLegalName,
+      email: clientEmail,
+      street: clientStreet,
+      city: clientCity,
+      province: clientProvince,
+      postal: clientPostal,
+    });
+  }, [contactName, clientLegalName, clientEmail, clientStreet, clientCity, clientProvince, clientPostal]);
   const [serviceStartDate, setServiceStartDate] = useState("");
   const [campaignEndDate, setCampaignEndDate] = useState("");
   const [offerExpiry, setOfferExpiry] = useState("");

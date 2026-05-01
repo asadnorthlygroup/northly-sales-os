@@ -843,6 +843,7 @@ export default function ProposalBuilder({ mode = "full" }: { mode?: "full" | "qu
         }}
         selectedAccountHandles={selectedAccounts.map((a) => a.handle)}
         onClose={() => setShowInvoiceModal(false)}
+        isQuick={isQuick}
       />
     )}
     </>
