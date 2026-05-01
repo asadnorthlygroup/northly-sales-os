@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server";
-import { qbIsConnected } from "@/lib/quickbooks";
+import { qbVerifyConnection } from "@/lib/quickbooks";
 
 export async function GET() {
-  const connected = await qbIsConnected();
-  return NextResponse.json({ connected });
+  const result = await qbVerifyConnection();
+  return NextResponse.json({
+    connected: result.ok,
+    environment: result.environment,
+    realmId: result.realmId,
+    status: result.status,
+    detail: result.detail,
+  });
 }

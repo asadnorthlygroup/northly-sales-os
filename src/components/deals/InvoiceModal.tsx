@@ -88,11 +88,16 @@ export default function InvoiceModal({
   const [result, setResult] = useState<{ invoiceNumber: string; total: number; qbUrl: string } | null>(null);
   const [qbConnected, setQbConnected] = useState<boolean | null>(null);
   const [needsReconnect, setNeedsReconnect] = useState(false);
+  const [qbStatus, setQbStatus] = useState<{ connected: boolean; environment?: string; realmId?: string; detail?: string } | null>(null);
 
   useEffect(() => {
     fetch("/api/auth/quickbooks/status")
       .then((r) => r.json())
-      .then((d) => setQbConnected(d.connected))
+      .then((d) => {
+        setQbConnected(d.connected);
+        setQbStatus(d);
+        if (!d.connected) setNeedsReconnect(true);
+      })
       .catch(() => setQbConnected(false));
   }, []);
 
@@ -171,10 +176,20 @@ export default function InvoiceModal({
           {qbConnected === false && (
             <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3">
               <AlertCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
-              <div>
+              <div className="flex-1 min-w-0">
                 <div className="font-medium text-amber-800 text-sm">QuickBooks Not Connected</div>
                 <div className="text-amber-700 text-xs mt-1">You need to connect QuickBooks Online before creating invoices.</div>
-                <a href="/api/auth/quickbooks" className="inline-block mt-2 text-xs font-medium text-amber-800 underline">
+                {qbStatus?.environment && (
+                  <div className="text-amber-600 text-[11px] mt-1.5 font-mono">
+                    env: {qbStatus.environment}
+                    {qbStatus.realmId ? ` · realm: …${qbStatus.realmId.slice(-4)}` : ""}
+                    {qbStatus.detail ? ` · ${qbStatus.detail.slice(0, 80)}` : ""}
+                  </div>
+                )}
+                <a
+                  href={`/api/auth/quickbooks?return_to=${encodeURIComponent(typeof window !== "undefined" ? window.location.pathname + window.location.search : "/quick-io")}`}
+                  className="inline-block mt-2 text-xs font-medium text-amber-800 underline"
+                >
                   Connect QuickBooks →
                 </a>
               </div>

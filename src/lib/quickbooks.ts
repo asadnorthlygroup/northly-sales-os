@@ -1,7 +1,13 @@
 import { createClient } from "@supabase/supabase-js";
 
-const QB_API_BASE = "https://quickbooks.api.intuit.com/v3/company";
+// Use sandbox API base when QUICKBOOKS_ENVIRONMENT=sandbox (matches a sandbox QB Developer app);
+// otherwise default to production. OAuth and token URLs are the same for both environments.
+const QB_API_BASE = process.env.QUICKBOOKS_ENVIRONMENT === "sandbox"
+  ? "https://sandbox-quickbooks.api.intuit.com/v3/company"
+  : "https://quickbooks.api.intuit.com/v3/company";
 const QB_TOKEN_URL = "https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer";
+
+export function qbApiBase(): string { return QB_API_BASE; }
 
 function serviceSupabase() {
   return createClient(
@@ -74,5 +80,22 @@ export async function qbIsConnected(): Promise<boolean> {
     return true;
   } catch {
     return false;
+  }
+}
+
+/**
+ * Real connectivity check — hits CompanyInfo to confirm the token actually works
+ * against the configured QB_API_BASE (catches sandbox/production mismatches).
+ */
+export async function qbVerifyConnection(): Promise<{ ok: boolean; realmId?: string; environment: string; status?: number; detail?: string }> {
+  const environment = process.env.QUICKBOOKS_ENVIRONMENT === "sandbox" ? "sandbox" : "production";
+  try {
+    const { realm_id } = await getValidToken();
+    const res = await qbFetch(`/companyinfo/${realm_id}?minorversion=70`);
+    if (res.ok) return { ok: true, realmId: realm_id, environment };
+    const detail = await res.text();
+    return { ok: false, realmId: realm_id, environment, status: res.status, detail };
+  } catch (err) {
+    return { ok: false, environment, detail: err instanceof Error ? err.message : String(err) };
   }
 }

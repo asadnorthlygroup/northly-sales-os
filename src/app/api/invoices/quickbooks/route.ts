@@ -95,7 +95,13 @@ async function findOrCreateCustomer(
     const err = await createRes.text();
     // Surface auth failures clearly so the client can prompt a reconnect.
     if (err.includes("ApplicationAuthorizationFailed") || err.includes("003100") || createRes.status === 403) {
-      const e = new Error("QuickBooks authorization expired. Reconnect QuickBooks to continue.");
+      const env = process.env.QUICKBOOKS_ENVIRONMENT === "sandbox" ? "sandbox" : "production";
+      const e = new Error(
+        `QuickBooks rejected the request (3100/ApplicationAuthorizationFailed). ` +
+        `App is set to "${env}" environment. ` +
+        `If your QB Developer app is configured for the other environment, set ` +
+        `QUICKBOOKS_ENVIRONMENT=${env === "sandbox" ? "production" : "sandbox"} and redeploy.`
+      );
       (e as Error & { code?: string }).code = "qb_auth_failed";
       throw e;
     }
