@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, Receipt, ExternalLink, AlertCircle } from "lucide-react";
+import { X, Receipt, ExternalLink, AlertCircle, Link2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/pricing";
 import { loadBillingCache, saveBillingCache } from "@/lib/billing-cache";
@@ -87,6 +87,7 @@ export default function InvoiceModal({
   const [error, setError] = useState("");
   const [result, setResult] = useState<{ invoiceNumber: string; total: number; qbUrl: string } | null>(null);
   const [qbConnected, setQbConnected] = useState<boolean | null>(null);
+  const [needsReconnect, setNeedsReconnect] = useState(false);
 
   useEffect(() => {
     fetch("/api/auth/quickbooks/status")
@@ -131,9 +132,13 @@ export default function InvoiceModal({
       });
 
       const text = await res.text();
-      let data: { error?: string; invoiceNumber?: string; total?: number; qbUrl?: string } = {};
+      let data: { error?: string; code?: string; invoiceNumber?: string; total?: number; qbUrl?: string } = {};
       try { data = text ? JSON.parse(text) : {}; } catch { /* response wasn't JSON */ }
       if (!res.ok) {
+        if (data.code === "qb_auth_failed") {
+          setNeedsReconnect(true);
+          throw new Error(data.error ?? "QuickBooks authorization expired.");
+        }
         throw new Error(data.error ?? text ?? `Server error (HTTP ${res.status})`);
       }
       setResult({
@@ -325,8 +330,17 @@ export default function InvoiceModal({
               </div>
 
               {error && (
-                <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
-                  {error}
+                <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700 space-y-2">
+                  <div>{error}</div>
+                  {needsReconnect && (
+                    <a
+                      href="/api/auth/quickbooks"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-red-300 rounded-lg text-xs font-medium text-red-700 hover:bg-red-50 transition-colors"
+                    >
+                      <Link2 className="h-3 w-3" />
+                      Reconnect QuickBooks
+                    </a>
+                  )}
                 </div>
               )}
 

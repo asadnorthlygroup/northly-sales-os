@@ -93,6 +93,12 @@ async function findOrCreateCustomer(
 
   if (!createRes.ok) {
     const err = await createRes.text();
+    // Surface auth failures clearly so the client can prompt a reconnect.
+    if (err.includes("ApplicationAuthorizationFailed") || err.includes("003100") || createRes.status === 403) {
+      const e = new Error("QuickBooks authorization expired. Reconnect QuickBooks to continue.");
+      (e as Error & { code?: string }).code = "qb_auth_failed";
+      throw e;
+    }
     throw new Error(`Failed to create QB customer: ${err}`);
   }
 
@@ -272,7 +278,8 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({ invoiceId: inv.Id, invoiceNumber: inv.DocNumber, total, qbUrl });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error creating QuickBooks invoice";
+    const code = (err as Error & { code?: string })?.code;
     console.error("[invoices/quickbooks]", err);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: message, code }, { status: code === "qb_auth_failed" ? 403 : 500 });
   }
 }
