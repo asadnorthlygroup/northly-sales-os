@@ -130,9 +130,17 @@ export default function InvoiceModal({
         }),
       });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Failed to create invoice");
-      setResult(data);
+      const text = await res.text();
+      let data: { error?: string; invoiceNumber?: string; total?: number; qbUrl?: string } = {};
+      try { data = text ? JSON.parse(text) : {}; } catch { /* response wasn't JSON */ }
+      if (!res.ok) {
+        throw new Error(data.error ?? text ?? `Server error (HTTP ${res.status})`);
+      }
+      setResult({
+        invoiceNumber: data.invoiceNumber ?? "",
+        total: data.total ?? 0,
+        qbUrl: data.qbUrl ?? "",
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {

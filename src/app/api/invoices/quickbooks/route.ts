@@ -118,6 +118,7 @@ export async function POST(request: NextRequest) {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
+  try {
   const body = await request.json() as {
     dealId: string;
     clientName: string;
@@ -269,4 +270,9 @@ export async function POST(request: NextRequest) {
   await saveInvoiceLocally(inv, body, taxAmount, total, qbUrl, session.user.id);
 
   return NextResponse.json({ invoiceId: inv.Id, invoiceNumber: inv.DocNumber, total, qbUrl });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error creating QuickBooks invoice";
+    console.error("[invoices/quickbooks]", err);
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }
