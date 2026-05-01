@@ -32,7 +32,8 @@ function fmtDate(dateStr: string): string {
   } catch { return dateStr; }
 }
 
-function getOptionLabel(n: number): string {
+function getOptionLabel(n: number, isQuick = false): string {
+  if (isQuick) return "Marketing Package";
   const labels: Record<number, string> = {
     2: "Option 2 — Pilot",
     3: "Option 3 — Multi-Page Awareness Bundle",
@@ -42,8 +43,16 @@ function getOptionLabel(n: number): string {
   return labels[n] ?? `Option ${n}`;
 }
 
-function getDeliverables(n: number, count: number): string[] {
+function getDeliverables(n: number, count: number, isQuick = false): string[] {
   const p = `${count} account${count !== 1 ? "s" : ""}`;
+  // Quick IO: stories are already itemized per account in the IO doc, so skip
+  // the canned "X story slides per account" line. Keep only the feed-post + management lines.
+  if (isQuick) {
+    return [
+      `Branded Instagram feed post on each account across ${p}`,
+      `Campaign management: strategy, copywriting, scheduling, and optimization`,
+    ];
+  }
   switch (n) {
     case 2: return [
       `1 branded Instagram feed post per account across ${p}`,
@@ -155,6 +164,7 @@ export async function POST(request: NextRequest) {
     optionPrice,
     markets,
     offerExpiry,
+    isQuick,
   } = body as {
     optionNumber: number;
     businessName: string;
@@ -179,6 +189,7 @@ export async function POST(request: NextRequest) {
     optionPrice: number;
     markets: string[];
     offerExpiry: string;
+    isQuick?: boolean;
   };
 
   const tax = PROVINCE_TAX[clientProvince?.toUpperCase()] ?? PROVINCE_TAX.ON;
@@ -194,7 +205,7 @@ export async function POST(request: NextRequest) {
   const collabAccounts  = accounts.filter((a) => a && collabSet.has(a.handle));
   const totalFollowers  = accounts.reduce((s, a) => s + (a?.followers ?? 0), 0);
 
-  const deliverables = getDeliverables(optionNumber, accounts.length);
+  const deliverables = getDeliverables(optionNumber, accounts.length, isQuick);
   const accountLines: string[] = [];
   if (primaryAccounts.length) {
     accountLines.push(`Primary accounts: ${primaryAccounts.map((a) => a!.handle).join(", ")}`);
@@ -255,7 +266,9 @@ export async function POST(request: NextRequest) {
     : (paymentSchedule?.[0]?.date ? `Due ${fmtDate(paymentSchedule[0].date)}` : "Due upon signing");
 
   const dateStr = new Date().toISOString().slice(0, 10);
-  const docTitle = `IO — ${businessName} — Option ${optionNumber} — ${dateStr}`;
+  const docTitle = isQuick
+    ? `IO — ${businessName} — Marketing Package — ${dateStr}`
+    : `IO — ${businessName} — Option ${optionNumber} — ${dateStr}`;
   const ah = { Authorization: `Bearer ${providerToken}`, "Content-Type": "application/json" };
 
   // 1. Copy template
@@ -294,7 +307,7 @@ export async function POST(request: NextRequest) {
     ["{{BILLING_CYCLE}}", paymentType === "single" ? "One-time" : "Installments"],
     ["{{SERVICE_START}}", fmtDate(serviceStartDate)],
     ["{{INVOICE_NUMBER}}", "TBD — assigned upon close"],
-    ["{{OPTION_LABEL}}", getOptionLabel(optionNumber)],
+    ["{{OPTION_LABEL}}", getOptionLabel(optionNumber, isQuick)],
     ["{{MARKETS}}", marketsText],
     ["{{OFFER_EXPIRY}}", offerExpiry ? fmtDate(offerExpiry) : "TBD"],
     ["{{DELIVERABLES_TEXT}}", delivText],

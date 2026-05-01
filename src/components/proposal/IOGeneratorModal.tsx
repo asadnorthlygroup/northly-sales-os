@@ -353,6 +353,7 @@ export default function IOGeneratorModal({
           optionPrice,
           markets: cities,
           offerExpiry,
+          isQuick,
         }),
       });
       const data = await res.json();
