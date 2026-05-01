@@ -797,17 +797,39 @@ export default function ProposalBuilder({ mode = "full" }: { mode?: "full" | "qu
       </div>
     </div>
 
-    {showIOModal && (
-      <IOGeneratorModal
-        businessName={form.businessName || "Client"}
-        cities={form.cities}
-        selectedAccounts={selectedAccounts}
-        ladder={effectiveLadder}
-        optionsCount={isQuick ? 2 : form.optionsCount}
-        collaboratorHandles={form.collaboratorHandles}
-        onClose={() => setShowIOModal(false)}
-      />
-    )}
+    {showIOModal && (() => {
+      // Derive story assignments + type from per-account add-ons when in Quick mode,
+      // so the IO doc reflects what was set in step 1.
+      const quickStoryAssignments = isQuick
+        ? selectedAccounts
+            .map((a) => ({
+              handle: a.handle,
+              included: (form.accountDeliverables[a.handle]?.story ?? 0) > 0,
+              qty: form.accountDeliverables[a.handle]?.story ?? 0,
+            }))
+            .filter((sa) => sa.included)
+        : undefined;
+      const includedHandles = quickStoryAssignments?.map((sa) => sa.handle) ?? [];
+      const allFree = includedHandles.length > 0 && includedHandles.every((h) => form.freeStoryAccounts.includes(h));
+      const allPaid = includedHandles.length > 0 && includedHandles.every((h) => !form.freeStoryAccounts.includes(h));
+      const quickStoryType: "complementary" | "full_price" | "other" | undefined = isQuick
+        ? (allFree ? "complementary" : allPaid ? "full_price" : "other")
+        : undefined;
+      return (
+        <IOGeneratorModal
+          businessName={form.businessName || "Client"}
+          cities={form.cities}
+          selectedAccounts={selectedAccounts}
+          ladder={effectiveLadder}
+          optionsCount={isQuick ? 2 : form.optionsCount}
+          collaboratorHandles={form.collaboratorHandles}
+          onClose={() => setShowIOModal(false)}
+          isQuick={isQuick}
+          initialStoryAssignments={quickStoryAssignments}
+          initialStoryType={quickStoryType}
+        />
+      );
+    })()}
     {showInvoiceModal && (
       <InvoiceModal
         dealId={savedDealId ?? undefined}

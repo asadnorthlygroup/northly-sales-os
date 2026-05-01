@@ -195,6 +195,9 @@ interface IOGeneratorModalProps {
   optionsCount: number;
   collaboratorHandles?: string[];
   onClose: () => void;
+  isQuick?: boolean;
+  initialStoryAssignments?: { handle: string; included: boolean; qty: number }[];
+  initialStoryType?: "complementary" | "full_price" | "other";
 }
 
 function SectionHeader({ children }: { children: React.ReactNode }) {
@@ -225,6 +228,9 @@ export default function IOGeneratorModal({
   optionsCount,
   collaboratorHandles = [],
   onClose,
+  isQuick = false,
+  initialStoryAssignments,
+  initialStoryType,
 }: IOGeneratorModalProps) {
   const [optionNumber, setOptionNumber] = useState<number>(Math.min(optionsCount, 2));
   const [contactName, setContactName] = useState("");
@@ -250,11 +256,15 @@ export default function IOGeneratorModal({
   const [serviceStartDate, setServiceStartDate] = useState("");
   const [campaignEndDate, setCampaignEndDate] = useState("");
   const [offerExpiry, setOfferExpiry] = useState("");
-  const [storyServicesType, setStoryServicesType] = useState<"complementary" | "full_price" | "other">("complementary");
+  const [storyServicesType, setStoryServicesType] = useState<"complementary" | "full_price" | "other">(
+    initialStoryType ?? "complementary"
+  );
   const [storyServicesNote, setStoryServicesNote] = useState("");
   const [storyRate, setStoryRate] = useState("");
   const [storyAssignments, setStoryAssignments] = useState<StoryAssignment[]>(
-    () => selectedAccounts.map((a) => ({ handle: a.handle, included: true, qty: 1 }))
+    () => initialStoryAssignments && initialStoryAssignments.length > 0
+      ? initialStoryAssignments
+      : selectedAccounts.map((a) => ({ handle: a.handle, included: true, qty: 1 }))
   );
   const [paymentType, setPaymentType] = useState<"single" | "multiple">("single");
   const [paymentCount, setPaymentCount] = useState(2);
@@ -407,30 +417,34 @@ export default function IOGeneratorModal({
           <>
             {/* Scrollable form */}
             <div className="flex-1 overflow-y-auto px-6 pb-6">
-              {/* Pricing preview */}
-              <div className="mt-4 rounded-xl border bg-slate-50 px-4 py-3 flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Selected option total (before tax)</span>
-                <span className="font-bold text-slate-900">{formatCurrency(optionPrice)}</span>
-              </div>
+              {!isQuick && (
+                <>
+                  {/* Pricing preview */}
+                  <div className="mt-4 rounded-xl border bg-slate-50 px-4 py-3 flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Selected option total (before tax)</span>
+                    <span className="font-bold text-slate-900">{formatCurrency(optionPrice)}</span>
+                  </div>
 
-              {/* Option selection */}
-              <SectionHeader>Option</SectionHeader>
-              <Field label="Which option is this IO for?" required>
-                <Select value={String(optionNumber)} onValueChange={(v) => setOptionNumber(Number(v))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {availableOptions.map((n) => (
-                      <SelectItem key={n} value={String(n)}>
-                        Option {n} — {formatCurrency(optionPriceMap[n] ?? 0)}
-                        {n === 2 && " (Pilot)"}
-                        {n === 3 && " (Awareness Bundle)"}
-                        {n === 4 && " (Awareness + Conversion)"}
-                        {n === 5 && " (Full Campaign)"}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field>
+                  {/* Option selection */}
+                  <SectionHeader>Option</SectionHeader>
+                  <Field label="Which option is this IO for?" required>
+                    <Select value={String(optionNumber)} onValueChange={(v) => setOptionNumber(Number(v))}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {availableOptions.map((n) => (
+                          <SelectItem key={n} value={String(n)}>
+                            Option {n} — {formatCurrency(optionPriceMap[n] ?? 0)}
+                            {n === 2 && " (Pilot)"}
+                            {n === 3 && " (Awareness Bundle)"}
+                            {n === 4 && " (Awareness + Conversion)"}
+                            {n === 5 && " (Full Campaign)"}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                </>
+              )}
 
               {/* Client billing */}
               <SectionHeader>Client Billing Details</SectionHeader>
@@ -458,7 +472,7 @@ export default function IOGeneratorModal({
                     <p className="text-xs text-slate-400 mt-1">Start typing — city, province, and postal will fill automatically.</p>
                   )}
                   {placesError && (
-                    <p className="text-xs text-amber-600 mt-1">Address autocomplete unavailable — fill in manually. ({placesError})</p>
+                    <p className="text-xs text-slate-400 mt-1">Autocomplete unavailable — type the address manually.</p>
                   )}
                 </Field>
                 <div className="grid grid-cols-2 gap-3">
@@ -500,7 +514,8 @@ export default function IOGeneratorModal({
                 </Field>
               </div>
 
-              {/* Story services */}
+              {/* Story services — hidden in Quick mode (configured in step 1) */}
+              {!isQuick && (<>
               <SectionHeader>Story Services</SectionHeader>
               <div className="space-y-3">
                 <Field label="How should stories be handled?" required>
@@ -584,6 +599,7 @@ export default function IOGeneratorModal({
                   </Field>
                 )}
               </div>
+              </>)}
 
               {/* Payment */}
               <SectionHeader>Payment</SectionHeader>
