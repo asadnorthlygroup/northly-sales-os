@@ -83,6 +83,8 @@ interface ProposalForm {
   collaboratorAdjustMode: "discount" | "surcharge" | "none";
   collaboratorAdjustValue: number;
   customCategory: string;
+  quickDiscountMode: "percent" | "flat";
+  quickDiscountValue: number;
 }
 
 interface PackageRecord {
@@ -134,6 +136,8 @@ const DEFAULT_FORM: ProposalForm = {
   collaboratorAdjustMode: "none",
   collaboratorAdjustValue: 15,
   customCategory: "",
+  quickDiscountMode: "percent",
+  quickDiscountValue: 0,
 };
 
 const STEPS = ["Business", "Strategy", "Pages & Pricing", "Output"] as const;
@@ -444,6 +448,24 @@ export default function ProposalBuilder({ mode = "full" }: { mode?: "full" | "qu
     [selectedBaseTotal, form.option2Discount, form.option3Discount, form.option4Discount, form.option5Discount]
   );
 
+  // In Quick IO mode: a single discount applied to the full subtotal drives
+  // a flat "ladder" with all option prices set to the same final value.
+  const effectiveLadder = useMemo(() => {
+    if (!isQuick) return ladder;
+    const subtotal = selectedBaseTotal;
+    const discountAmount = form.quickDiscountMode === "percent"
+      ? subtotal * (form.quickDiscountValue / 100)
+      : form.quickDiscountValue;
+    const finalPrice = roundProposalPrice(Math.max(0, subtotal - discountAmount));
+    return {
+      ...ladder,
+      option2Price: finalPrice,
+      option3Price: finalPrice,
+      option4Price: finalPrice,
+      option5Price: finalPrice,
+    };
+  }, [isQuick, ladder, selectedBaseTotal, form.quickDiscountMode, form.quickDiscountValue]);
+
   const strategyHook = useMemo(() => getStrategyHook(form.category), [form.category]);
 
   const toggleAccount = (handle: string) => {
@@ -623,11 +645,14 @@ export default function ProposalBuilder({ mode = "full" }: { mode?: "full" | "qu
                 {form.businessName && <div>Client: <span className="text-slate-900">{form.businessName}</span></div>}
                 <div>Cities: <span className="text-slate-900">{form.cities.map(cityLabel).join(", ")}</span></div>
                 <div>Pages selected: <span className="font-semibold text-slate-900">{selectedAccounts.length}</span></div>
-                {selectedBaseTotal > 0 && (
+                {selectedBaseTotal > 0 && !isQuick && (
                   <>
                     <div>Opt 2 (Pilot): <span className="font-semibold text-green-700">{formatCurrency(ladder.option2Price)}</span></div>
                     <div>Opt 3 (Bundle): <span className="font-semibold text-green-700">{formatCurrency(ladder.option3Price)}</span></div>
                   </>
+                )}
+                {selectedBaseTotal > 0 && isQuick && (
+                  <div>Subtotal: <span className="font-semibold text-green-700">{formatCurrency(selectedBaseTotal)}</span></div>
                 )}
               </div>
             </CardContent>
@@ -777,8 +802,8 @@ export default function ProposalBuilder({ mode = "full" }: { mode?: "full" | "qu
         businessName={form.businessName || "Client"}
         cities={form.cities}
         selectedAccounts={selectedAccounts}
-        ladder={ladder}
-        optionsCount={form.optionsCount}
+        ladder={effectiveLadder}
+        optionsCount={isQuick ? 2 : form.optionsCount}
         collaboratorHandles={form.collaboratorHandles}
         onClose={() => setShowIOModal(false)}
       />
@@ -788,10 +813,10 @@ export default function ProposalBuilder({ mode = "full" }: { mode?: "full" | "qu
         dealId={savedDealId ?? undefined}
         clientName={form.businessName || "Client"}
         optionPrices={{
-          option2Price: ladder.option2Price,
-          option3Price: ladder.option3Price,
-          option4Price: ladder.option4Price,
-          option5Price: ladder.option5Price,
+          option2Price: effectiveLadder.option2Price,
+          option3Price: effectiveLadder.option3Price,
+          option4Price: effectiveLadder.option4Price,
+          option5Price: effectiveLadder.option5Price,
         }}
         selectedAccountHandles={selectedAccounts.map((a) => a.handle)}
         onClose={() => setShowInvoiceModal(false)}
@@ -2149,6 +2174,8 @@ function Step4Output({
 // ─────────────────────────────────────────────
 // Quick Pricing Summary (used in Quick IO mode)
 // ─────────────────────────────────────────────
+const TAX_DEFAULT = { name: "HST (ON)", rate: 0.13 };
+
 function QuickPricingSummary({
   form,
   setForm,
@@ -2162,17 +2189,23 @@ function QuickPricingSummary({
   selectedAccounts: AccountSeed[];
   priceOf: (a: AccountSeed) => number;
 }) {
-  const options = [
-    { n: 2, label: "Option 2 — Awareness Pilot",       discKey: "option2Discount" as const, standard: ladder.option2StandardValue, price: ladder.option2Price },
-    { n: 3, label: "Option 3 — Awareness Bundle",      discKey: "option3Discount" as const, standard: ladder.option3StandardValue, price: ladder.option3Price },
-    { n: 4, label: "Option 4 — Awareness + Conversion",discKey: "option4Discount" as const, standard: ladder.option4StandardValue, price: ladder.option4Price },
-    { n: 5, label: "Option 5 — Full Campaign",         discKey: "option5Discount" as const, standard: ladder.option5StandardValue, price: ladder.option5Price },
-  ].slice(0, form.optionsCount - 1);
+  const subtotal = ladder.option2StandardValue;
+  const mode = form.quickDiscountMode;
+  const value = form.quickDiscountValue;
 
-  const setDiscount = (key: "option2Discount" | "option3Discount" | "option4Discount" | "option5Discount", value: number) => {
+  const discountAmount = mode === "percent" ? subtotal * (value / 100) : value;
+  const subtotalAfter = Math.max(0, subtotal - discountAmount);
+  const taxAmount = Math.round(subtotalAfter * TAX_DEFAULT.rate * 100) / 100;
+  const total = subtotalAfter + taxAmount;
+
+  const updateMode = (m: "percent" | "flat") => {
     if (!setForm) return;
-    const clamped = Math.max(0, Math.min(95, value));
-    setForm((f) => ({ ...f, [key]: clamped }));
+    setForm((f) => ({ ...f, quickDiscountMode: m, quickDiscountValue: 0 }));
+  };
+  const updateValue = (v: number) => {
+    if (!setForm) return;
+    const clamped = Math.max(0, mode === "percent" ? Math.min(95, v) : v);
+    setForm((f) => ({ ...f, quickDiscountValue: clamped }));
   };
 
   return (
@@ -2186,43 +2219,72 @@ function QuickPricingSummary({
               <span className="font-medium">{formatCurrency(priceOf(a))}</span>
             </div>
           ))}
-          <div className="flex justify-between text-sm font-bold pt-1">
-            <span>Total (standard)</span>
-            <span>{formatCurrency(ladder.option2StandardValue)}</span>
-          </div>
         </div>
       </div>
 
       <div>
-        <h3 className="font-medium text-sm mb-2">Options &amp; Discounts</h3>
-        <p className="text-xs text-slate-500 mb-2">Adjust the discount % per option — the final price updates live and is what flows into the IO and Invoice.</p>
-        <div className="rounded-xl border border-slate-200 overflow-hidden divide-y divide-slate-100">
-          {options.map(({ n, label, discKey, standard, price }) => {
-            const disc = form[discKey];
-            return (
-              <div key={n} className="flex items-center gap-3 px-3 py-2.5 text-sm">
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium text-slate-800">{label}</div>
-                  <div className="text-xs text-slate-400">Standard: {formatCurrency(standard)}</div>
-                </div>
-                <div className="flex items-center gap-1 shrink-0">
-                  <Input
-                    type="number"
-                    min={0}
-                    max={95}
-                    value={disc}
-                    onChange={(e) => setDiscount(discKey, parseInt(e.target.value) || 0)}
-                    className="w-14 h-7 text-center text-sm"
-                  />
-                  <span className="text-xs text-slate-500">% off</span>
-                </div>
-                <div className="w-24 text-right font-bold text-slate-900 shrink-0">
-                  {formatCurrency(price)}
-                </div>
-              </div>
-            );
-          })}
+        <h3 className="font-medium text-sm mb-2">Discount</h3>
+        <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 space-y-3">
+          <div className="flex items-center gap-2">
+            <div className="flex bg-white rounded-lg border border-slate-200 overflow-hidden">
+              <button
+                type="button"
+                onClick={() => updateMode("percent")}
+                className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                  mode === "percent" ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-50"
+                }`}
+              >
+                % off
+              </button>
+              <button
+                type="button"
+                onClick={() => updateMode("flat")}
+                className={`px-3 py-1.5 text-xs font-medium transition-colors border-l border-slate-200 ${
+                  mode === "flat" ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-50"
+                }`}
+              >
+                $ off
+              </button>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Input
+                type="number"
+                min={0}
+                max={mode === "percent" ? 95 : undefined}
+                value={value}
+                onChange={(e) => updateValue(parseFloat(e.target.value) || 0)}
+                className="w-24 h-8 text-sm"
+              />
+              <span className="text-xs text-slate-500">{mode === "percent" ? "%" : "$"}</span>
+            </div>
+          </div>
         </div>
+      </div>
+
+      <div className="rounded-xl border border-slate-200 px-4 py-3 space-y-1.5 text-sm">
+        <div className="flex justify-between text-slate-600">
+          <span>Subtotal</span>
+          <span>{formatCurrency(subtotal)}</span>
+        </div>
+        {discountAmount > 0 && (
+          <div className="flex justify-between text-emerald-700">
+            <span>Discount {mode === "percent" ? `(${value}%)` : ""}</span>
+            <span>− {formatCurrency(discountAmount)}</span>
+          </div>
+        )}
+        <div className="flex justify-between font-medium text-slate-900 pt-1.5 border-t border-slate-100">
+          <span>Subtotal after discount</span>
+          <span>{formatCurrency(subtotalAfter)}</span>
+        </div>
+        <div className="flex justify-between text-slate-600">
+          <span>{TAX_DEFAULT.name} @ {(TAX_DEFAULT.rate * 100).toFixed(0)}%</span>
+          <span>{formatCurrency(taxAmount)}</span>
+        </div>
+        <div className="flex justify-between font-bold text-base text-slate-900 pt-1.5 border-t border-slate-200">
+          <span>Total</span>
+          <span>{formatCurrency(total)}</span>
+        </div>
+        <p className="text-[11px] text-slate-400 pt-1">Tax shown for ON (HST 13%); the IO doc lets you set the actual province.</p>
       </div>
     </div>
   );
