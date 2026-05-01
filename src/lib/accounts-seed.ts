@@ -238,9 +238,14 @@ export function getAccountsForCities(
   cityGroupKeys: string[],
   category?: BusinessCategory
 ): AccountSeed[] {
-  const markets = cityGroupKeys.flatMap(
+  let markets = cityGroupKeys.flatMap(
     (gk) => CITY_GROUPS.find((g) => g.key === gk)?.markets ?? []
   );
+  // Always include national accounts when a specific city is targeted —
+  // they have national reach and remain relevant alongside any city.
+  if (markets.length > 0 && !markets.includes("national")) {
+    markets = [...markets, "national"];
+  }
   return ACCOUNTS_SEED.filter(
     (a) =>
       markets.includes(a.market) &&

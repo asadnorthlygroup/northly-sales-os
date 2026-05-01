@@ -77,10 +77,12 @@ interface ProposalForm {
   notes: string;
   selectedAccounts: Record<string, boolean>;
   customPrices: Record<string, number>;
-  accountDeliverables: Record<string, { ga: number; oc: number; th: number }>;
+  accountDeliverables: Record<string, { ga: number; oc: number; th: number; story: number }>;
+  freeStoryAccounts: string[];
   collaboratorHandles: string[];
   collaboratorAdjustMode: "discount" | "surcharge" | "none";
   collaboratorAdjustValue: number;
+  customCategory: string;
 }
 
 interface PackageRecord {
@@ -127,9 +129,11 @@ const DEFAULT_FORM: ProposalForm = {
   selectedAccounts: {},
   customPrices: {},
   accountDeliverables: {},
+  freeStoryAccounts: [],
   collaboratorHandles: [],
   collaboratorAdjustMode: "none",
   collaboratorAdjustValue: 15,
+  customCategory: "",
 };
 
 const STEPS = ["Business", "Strategy", "Pages & Pricing", "Output"] as const;
@@ -361,8 +365,8 @@ export default function ProposalBuilder({ mode = "full" }: { mode?: "full" | "qu
   };
 
   const relevantAccounts = useMemo(
-    () => getAccountsForCities(form.cities, form.category),
-    [form.cities, form.category]
+    () => getAccountsForCities(form.cities, form.customCategory ? undefined : form.category),
+    [form.cities, form.category, form.customCategory]
   );
 
   const accountsByCity = useMemo(() => {
@@ -416,9 +420,12 @@ export default function ProposalBuilder({ mode = "full" }: { mode?: "full" | "qu
       if (d.ga > 0 && account.gaRate > 0) cost += applyMarkup(account.gaRate) * d.ga;
       if (d.oc > 0 && account.ocRate > 0) cost += applyMarkup(account.ocRate) * d.oc;
       if (d.th > 0 && account.talkingHeadRate > 0) cost += applyMarkup(account.talkingHeadRate) * d.th;
+      if (d.story > 0 && account.storyRate > 0 && !form.freeStoryAccounts.includes(account.handle)) {
+        cost += applyMarkup(account.storyRate) * d.story;
+      }
       return cost;
     },
-    [applyMarkup, form.accountDeliverables]
+    [applyMarkup, form.accountDeliverables, form.freeStoryAccounts]
   );
 
   const selectedBaseTotal = useMemo(
@@ -676,6 +683,7 @@ export default function ProposalBuilder({ mode = "full" }: { mode?: "full" | "qu
                 applyMarkup={applyMarkup}
                 ladder={ladder}
                 toggleAccount={toggleAccount}
+                isQuick={isQuick}
               />
             )}
             {step === 4 && (
@@ -704,6 +712,7 @@ export default function ProposalBuilder({ mode = "full" }: { mode?: "full" | "qu
                 onGenerateIO={() => setShowIOModal(true)}
                 isQuick={isQuick}
                 onCreateInvoice={() => setShowInvoiceModal(true)}
+                setForm={setForm}
               />
             )}
 
@@ -1382,6 +1391,7 @@ function Step3Pages({
   applyMarkup,
   ladder,
   toggleAccount,
+  isQuick = false,
 }: {
   form: ProposalForm;
   setForm: React.Dispatch<React.SetStateAction<ProposalForm>>;
@@ -1392,6 +1402,7 @@ function Step3Pages({
   applyMarkup: (rate: number) => number;
   ladder: ReturnType<typeof computeLadderPrices>;
   toggleAccount: (handle: string) => void;
+  isQuick?: boolean;
 }) {
   const [editingHandle, setEditingHandle] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<string>("");
@@ -1439,13 +1450,13 @@ function Step3Pages({
       {/* Header card with title */}
       <Card className="rounded-2xl shadow-sm">
         <CardHeader className="pb-3">
-          <CardTitle>Step 3: Pages & Pricing</CardTitle>
+          <CardTitle>{isQuick ? "Step 1" : "Step 3"}: Pages & Pricing</CardTitle>
           <CardDescription>Select pages, set pricing, and mark any collaborator accounts.</CardDescription>
         </CardHeader>
         <CardContent className="pt-0">
           <div className="flex flex-wrap gap-3 items-center">
             <Badge variant="secondary"><MapPin className="h-3 w-3 mr-1" />{form.cities.map((c) => CITY_GROUPS.find((g) => g.key === c)?.label).join(", ")}</Badge>
-            <Badge variant="secondary"><Layers className="h-3 w-3 mr-1" />{CATEGORY_OPTIONS.find((c) => c.value === form.category)?.label}</Badge>
+            <Badge variant="secondary"><Layers className="h-3 w-3 mr-1" />{form.customCategory || CATEGORY_OPTIONS.find((c) => c.value === form.category)?.label}</Badge>
             <Badge variant="secondary"><DollarSign className="h-3 w-3 mr-1" />
               {form.markupMode === "none"
                 ? "No markup (base rate)"
@@ -1580,9 +1591,6 @@ function Step3Pages({
                                   reset
                                 </button>
                               )}
-                              <div className={`text-xs ${selected ? "text-white/70" : "text-slate-400"}`}>
-                                BA Feed Post + 2 Stories
-                              </div>
                               {selected && deliverableAddonCost(account) > 0 && (
                                 <div className={`text-xs mt-0.5 font-medium ${selected ? "text-white/80" : "text-slate-600"}`}>
                                   +{formatCurrency(deliverableAddonCost(account))} add-ons
@@ -1626,20 +1634,44 @@ function Step3Pages({
                       )}
 
                       {/* Per-account add-on deliverables (only when selected) */}
-                      {selected && !isEditing && (account.gaRate > 0 || account.ocRate > 0 || account.talkingHeadRate > 0) && (
+                      {selected && !isEditing && (account.gaRate > 0 || account.ocRate > 0 || account.talkingHeadRate > 0 || account.storyRate > 0) && (
                         <div className="mt-3 pt-3 border-t border-white/20 space-y-1.5" onClick={(e) => e.stopPropagation()}>
                           <div className="text-xs font-medium text-white/60 uppercase tracking-wide mb-1">Add-ons</div>
                           {([
+                            ["Story", "story", account.storyRate] as const,
                             ["GA", "ga", account.gaRate] as const,
                             ["OC Reel", "oc", account.ocRate] as const,
                             ["Talking Head", "th", account.talkingHeadRate] as const,
                           ].filter(([, , rate]) => rate > 0)).map(([label, key, rate]) => {
                             const qty = form.accountDeliverables[account.handle]?.[key] ?? 0;
-                            const unitPrice = applyMarkup(rate);
+                            const isFree = key === "story" && form.freeStoryAccounts.includes(account.handle);
+                            const unitPrice = isFree ? 0 : applyMarkup(rate);
                             return (
                               <div key={key} className="flex items-center justify-between gap-2">
                                 <span className="text-xs text-white/70 flex-1">{label}</span>
-                                <span className="text-xs text-white/50">{formatCurrency(unitPrice)}</span>
+                                {key === "story" && qty > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setForm((f) => ({
+                                        ...f,
+                                        freeStoryAccounts: isFree
+                                          ? f.freeStoryAccounts.filter((h) => h !== account.handle)
+                                          : [...f.freeStoryAccounts, account.handle],
+                                      }));
+                                    }}
+                                    className={`text-[10px] px-1.5 py-0.5 rounded font-medium transition-colors ${
+                                      isFree
+                                        ? "bg-emerald-400/30 text-emerald-100 border border-emerald-300/40"
+                                        : "bg-white/10 text-white/60 border border-white/20 hover:bg-white/20"
+                                    }`}
+                                    title="Toggle free / paid"
+                                  >
+                                    {isFree ? "Free" : "Paid"}
+                                  </button>
+                                )}
+                                <span className={`text-xs ${isFree ? "text-emerald-200/80 line-through" : "text-white/50"}`}>{formatCurrency(unitPrice)}</span>
                                 <div className="flex items-center gap-1">
                                   <button
                                     type="button"
@@ -1650,7 +1682,7 @@ function Step3Pages({
                                         ...f,
                                         accountDeliverables: {
                                           ...f.accountDeliverables,
-                                          [account.handle]: { ...( f.accountDeliverables[account.handle] ?? { ga: 0, oc: 0, th: 0 }), [key]: qty - 1 },
+                                          [account.handle]: { ...( f.accountDeliverables[account.handle] ?? { ga: 0, oc: 0, th: 0, story: 0 }), [key]: qty - 1 },
                                         },
                                       }));
                                     }}
@@ -1666,7 +1698,7 @@ function Step3Pages({
                                         ...f,
                                         accountDeliverables: {
                                           ...f.accountDeliverables,
-                                          [account.handle]: { ...( f.accountDeliverables[account.handle] ?? { ga: 0, oc: 0, th: 0 }), [key]: qty + 1 },
+                                          [account.handle]: { ...( f.accountDeliverables[account.handle] ?? { ga: 0, oc: 0, th: 0, story: 0 }), [key]: qty + 1 },
                                         },
                                       }));
                                     }}
@@ -1687,8 +1719,8 @@ function Step3Pages({
         ))
       )}
 
-      {/* Ladder summary */}
-      {selectedAccounts.length > 0 && (
+      {/* Ladder summary — hidden in quick mode (shown in step 2 instead) */}
+      {!isQuick && selectedAccounts.length > 0 && (
         <Card className="rounded-2xl shadow-sm">
           <CardHeader className="pb-3">
             <CardTitle className="text-base">5-Option Ladder Preview</CardTitle>
@@ -1741,6 +1773,8 @@ function QuickClientSetup({
     update("cities", next.length ? next : [key]);
   };
 
+  const isOther = !!form.customCategory;
+
   return (
     <Card className="rounded-2xl shadow-sm border-slate-200">
       <CardHeader className="pb-3">
@@ -1762,14 +1796,33 @@ function QuickClientSetup({
           </div>
           <div>
             <Label className="text-xs text-slate-600 mb-1.5 block">Business category</Label>
-            <Select value={form.category} onValueChange={(v) => update("category", v as BusinessCategory)}>
+            <Select
+              value={isOther ? "_other" : form.category}
+              onValueChange={(v) => {
+                if (v === "_other") {
+                  update("customCategory", form.customCategory || "Other");
+                } else {
+                  update("customCategory", "");
+                  update("category", v as BusinessCategory);
+                }
+              }}
+            >
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 {CATEGORY_OPTIONS.map((c) => (
                   <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
                 ))}
+                <SelectItem value="_other">Other (custom)</SelectItem>
               </SelectContent>
             </Select>
+            {isOther && (
+              <Input
+                value={form.customCategory}
+                onChange={(e) => update("customCategory", e.target.value)}
+                placeholder="Type a category name…"
+                className="mt-2"
+              />
+            )}
           </div>
         </div>
         <div>
@@ -1827,6 +1880,7 @@ function Step4Output({
   onGenerateIO,
   isQuick = false,
   onCreateInvoice,
+  setForm,
 }: {
   proposalText: string;
   proposalHTML: string;
@@ -1852,6 +1906,7 @@ function Step4Output({
   onGenerateIO: () => void;
   isQuick?: boolean;
   onCreateInvoice?: () => void;
+  setForm?: React.Dispatch<React.SetStateAction<ProposalForm>>;
 }) {
   const [chatInput, setChatInput] = useState("");
   const [chatHistory, setChatHistory] = useState<{ role: "user" | "ai"; text: string }[]>([]);
@@ -1926,7 +1981,7 @@ function Step4Output({
           </div>
 
           {isQuick ? (
-            <QuickPricingSummary form={form} ladder={ladder} selectedAccounts={selectedAccounts} priceOf={priceOf} />
+            <QuickPricingSummary form={form} setForm={setForm} ladder={ladder} selectedAccounts={selectedAccounts} priceOf={priceOf} />
           ) : (
           <Tabs defaultValue="email" className="w-full">
             <TabsList className="mb-4">
@@ -2096,17 +2151,32 @@ function Step4Output({
 // ─────────────────────────────────────────────
 function QuickPricingSummary({
   form,
+  setForm,
   ladder,
   selectedAccounts,
   priceOf,
 }: {
   form: ProposalForm;
+  setForm?: React.Dispatch<React.SetStateAction<ProposalForm>>;
   ladder: ReturnType<typeof computeLadderPrices>;
   selectedAccounts: AccountSeed[];
   priceOf: (a: AccountSeed) => number;
 }) {
+  const options = [
+    { n: 2, label: "Option 2 — Awareness Pilot",       discKey: "option2Discount" as const, standard: ladder.option2StandardValue, price: ladder.option2Price },
+    { n: 3, label: "Option 3 — Awareness Bundle",      discKey: "option3Discount" as const, standard: ladder.option3StandardValue, price: ladder.option3Price },
+    { n: 4, label: "Option 4 — Awareness + Conversion",discKey: "option4Discount" as const, standard: ladder.option4StandardValue, price: ladder.option4Price },
+    { n: 5, label: "Option 5 — Full Campaign",         discKey: "option5Discount" as const, standard: ladder.option5StandardValue, price: ladder.option5Price },
+  ].slice(0, form.optionsCount - 1);
+
+  const setDiscount = (key: "option2Discount" | "option3Discount" | "option4Discount" | "option5Discount", value: number) => {
+    if (!setForm) return;
+    const clamped = Math.max(0, Math.min(95, value));
+    setForm((f) => ({ ...f, [key]: clamped }));
+  };
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <div>
         <h3 className="font-medium text-sm mb-2">Selected Pages ({selectedAccounts.length})</h3>
         <div className="space-y-1">
@@ -2122,20 +2192,36 @@ function QuickPricingSummary({
           </div>
         </div>
       </div>
+
       <div>
-        <h3 className="font-medium text-sm mb-2">Option Prices</h3>
-        <div className="space-y-1">
-          {[
-            { label: "Option 2 — Awareness Pilot", price: ladder.option2Price },
-            { label: "Option 3 — Awareness Bundle", price: ladder.option3Price },
-            { label: "Option 4 — Awareness + Conversion", price: ladder.option4Price },
-            { label: "Option 5 — Full Campaign", price: ladder.option5Price },
-          ].slice(0, form.optionsCount - 1).map(({ label, price }) => (
-            <div key={label} className="flex justify-between text-sm py-1 border-b">
-              <span>{label}</span>
-              <span className="font-bold">{formatCurrency(price)}</span>
-            </div>
-          ))}
+        <h3 className="font-medium text-sm mb-2">Options &amp; Discounts</h3>
+        <p className="text-xs text-slate-500 mb-2">Adjust the discount % per option — the final price updates live and is what flows into the IO and Invoice.</p>
+        <div className="rounded-xl border border-slate-200 overflow-hidden divide-y divide-slate-100">
+          {options.map(({ n, label, discKey, standard, price }) => {
+            const disc = form[discKey];
+            return (
+              <div key={n} className="flex items-center gap-3 px-3 py-2.5 text-sm">
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-slate-800">{label}</div>
+                  <div className="text-xs text-slate-400">Standard: {formatCurrency(standard)}</div>
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  <Input
+                    type="number"
+                    min={0}
+                    max={95}
+                    value={disc}
+                    onChange={(e) => setDiscount(discKey, parseInt(e.target.value) || 0)}
+                    className="w-14 h-7 text-center text-sm"
+                  />
+                  <span className="text-xs text-slate-500">% off</span>
+                </div>
+                <div className="w-24 text-right font-bold text-slate-900 shrink-0">
+                  {formatCurrency(price)}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>
