@@ -334,7 +334,7 @@ export default function InvoiceModal({
                   <div>{error}</div>
                   {needsReconnect && (
                     <a
-                      href="/api/auth/quickbooks"
+                      href={`/api/auth/quickbooks?return_to=${encodeURIComponent(typeof window !== "undefined" ? window.location.pathname + window.location.search : "/quick-io")}`}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-red-300 rounded-lg text-xs font-medium text-red-700 hover:bg-red-50 transition-colors"
                     >
                       <Link2 className="h-3 w-3" />

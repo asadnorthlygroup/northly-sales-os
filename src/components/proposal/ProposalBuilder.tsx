@@ -328,6 +328,14 @@ export default function ProposalBuilder({ mode = "full" }: { mode?: "full" | "qu
     );
     if (hasSaved && !hasUrlParams) setDraftRestored(true);
 
+    // Show confirmation toast when returning from a successful QB OAuth flow.
+    if (searchParams.get("qb") === "connected") {
+      toast({
+        title: "QuickBooks reconnected",
+        description: "You can retry creating the invoice now.",
+      });
+    }
+
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

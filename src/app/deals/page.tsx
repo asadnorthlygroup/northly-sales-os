@@ -155,7 +155,7 @@ export default function DealsPage() {
         {qbBanner === "connected" && (
           <div className="flex items-center gap-3 p-4 bg-green-50 border border-green-200 rounded-xl text-sm text-green-800">
             <CheckCircle className="h-4 w-4 shrink-0" />
-            QuickBooks connected successfully. You can now create invoices from won deals.
+            QuickBooks connected successfully. You can now create invoices.
           </div>
         )}
         {qbBanner === "error" && (

@@ -9,9 +9,18 @@ export async function GET(request: NextRequest) {
   const code = searchParams.get("code");
   const realmId = searchParams.get("realmId");
   const appUrl = requestUrl.origin;
+  const returnTo = request.cookies.get("qb_return_to")?.value;
+  const successPath = returnTo && returnTo.startsWith("/") ? returnTo : "/deals";
+  const errorPath = successPath;
+
+  function redirectAndClear(target: string) {
+    const res = NextResponse.redirect(`${appUrl}${target}`);
+    res.cookies.delete("qb_return_to");
+    return res;
+  }
 
   if (!code) {
-    return NextResponse.redirect(`${appUrl}/deals?error=qb_no_code`);
+    return redirectAndClear(`${errorPath}${errorPath.includes("?") ? "&" : "?"}error=qb_no_code`);
   }
 
   const creds = Buffer.from(
@@ -35,7 +44,7 @@ export async function GET(request: NextRequest) {
   if (!tokenRes.ok) {
     const detail = await tokenRes.text();
     console.error("QB token exchange failed:", detail);
-    return NextResponse.redirect(`${appUrl}/deals?error=qb_token_failed`);
+    return redirectAndClear(`${errorPath}${errorPath.includes("?") ? "&" : "?"}error=qb_token_failed`);
   }
 
   const t = await tokenRes.json();
@@ -59,8 +68,8 @@ export async function GET(request: NextRequest) {
 
   if (error) {
     console.error("QB token save error:", error);
-    return NextResponse.redirect(`${appUrl}/deals?error=qb_save_failed`);
+    return redirectAndClear(`${errorPath}${errorPath.includes("?") ? "&" : "?"}error=qb_save_failed`);
   }
 
-  return NextResponse.redirect(`${appUrl}/deals?qb=connected`);
+  return redirectAndClear(`${successPath}${successPath.includes("?") ? "&" : "?"}qb=connected`);
 }
