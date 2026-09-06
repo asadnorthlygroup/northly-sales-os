@@ -1,5 +1,6 @@
 "use client";
 
+import { placementRate } from "@/lib/account-rates";
 import React, { useMemo, useState, useCallback, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -411,8 +412,15 @@ export default function ProposalBuilder({ mode = "full" }: { mode?: "full" | "qu
       if (form.customPrices[account.handle] !== undefined) {
         return form.customPrices[account.handle];
       }
-      let price = applyMarkup(account.baseRate);
-      if (form.collaboratorHandles.includes(account.handle)) {
+
+      const isCollaborator = form.collaboratorHandles.includes(account.handle);
+
+      // The 2026 rate card governs feed and collaborator rates. A collaborator
+      // placement is half a dedicated one, so the old "adjust by a percentage"
+      // controls now refine the card rate rather than discount a full rate.
+      let price = applyMarkup(placementRate(account, isCollaborator));
+
+      if (isCollaborator) {
         if (form.collaboratorAdjustMode === "discount") {
           price = roundProposalPrice(price * (1 - form.collaboratorAdjustValue / 100));
         } else if (form.collaboratorAdjustMode === "surcharge") {
