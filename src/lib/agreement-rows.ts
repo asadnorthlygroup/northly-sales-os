@@ -38,6 +38,11 @@ export interface AgreementInput {
   invoiceNumber: string;
   lines: AgreementLine[];
   totals: InvoiceTotals;
+  /**
+   * Deal-specific special conditions. Left blank the template example text
+   * survives into the agreement, promising incentives never offered.
+   */
+  specialConditions?: string;
 }
 
 /** Row 0 and row 1 of the Customer table, left to right. */

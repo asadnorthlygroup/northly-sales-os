@@ -96,6 +96,37 @@ export function cellInsertIndex(cell: docs_v1.Schema$TableCell): number {
   return cell.startIndex! + 1;
 }
 
+/** Columns in a table, taken from its widest row. */
+export function tableColumnCount(table: docs_v1.Schema$Table): number {
+  return (table.tableRows ?? []).reduce(
+    (max, row) => Math.max(max, (row.tableCells ?? []).length),
+    0
+  );
+}
+
+/**
+ * Counts trailing rows whose first cell spans the full width.
+ *
+ * The template ends the Services table with a merged "Total Following reach"
+ * note. Its other cells exist in the API model but are hidden by the merge, so
+ * anything written into them silently disappears — which is how the grand
+ * total went missing. Summary rows must stop before these.
+ */
+export function countTrailingFullWidthRows(table: docs_v1.Schema$Table): number {
+  const rows = table.tableRows ?? [];
+  const columns = tableColumnCount(table);
+  if (columns === 0) return 0;
+
+  let count = 0;
+  for (let i = rows.length - 1; i >= 0; i -= 1) {
+    const first = (rows[i].tableCells ?? [])[0];
+    const span = first?.tableCellStyle?.columnSpan ?? 1;
+    if (span >= columns) count += 1;
+    else break;
+  }
+  return count;
+}
+
 /**
  * Builds the text requests for one table, cell by cell.
  * Values shorter than the row are skipped, leaving those cells untouched.
@@ -238,7 +269,9 @@ export async function generateAgreement(
     const services = findTables(doc)[TEMPLATE_TABLES.services];
     if (services) {
       const firstSummaryRow = FIRST_ITEM_ROW + input.lines.length;
-      const existing = (services.table.tableRows?.length ?? 0) - firstSummaryRow;
+      const footerRows = countTrailingFullWidthRows(services.table);
+      const summaryEnd = (services.table.tableRows?.length ?? 0) - footerRows;
+      const existing = summaryEnd - firstSummaryRow;
       const missing = summary.length - existing;
       const requests: docs_v1.Schema$Request[] = [];
       for (let i = 0; i < missing; i += 1) {
@@ -281,15 +314,20 @@ export async function generateAgreement(
         values.push([row.item, row.description, row.price, row.spacer, row.quantity, row.fee]);
       }
 
-      // Summary rows sit immediately below the item rows.
-      const totalRows = services.table.tableRows?.length ?? 0;
+      // Summary rows sit below the item rows and above any merged footer row.
+      const footerRows = countTrailingFullWidthRows(services.table);
+      const summaryEnd = (services.table.tableRows?.length ?? 0) - footerRows;
       const firstSummaryRow = FIRST_ITEM_ROW + rows.length;
 
       summary.forEach((entry, i) => {
         const rowIndex = firstSummaryRow + i;
-        if (rowIndex >= totalRows) return;
+        if (rowIndex >= summaryEnd) return;
         while (values.length < rowIndex) values.push(null as never);
-        values[rowIndex] = [null, null, null, null, entry.label, entry.value];
+        // Column 0 is cleared across the summary block. The template ships an
+        // example "Early Signing Incentive" there; carrying it over would
+        // commit us to deliverables nobody agreed to.
+        const firstColumn = i === 0 ? input.specialConditions ?? "" : "";
+        values[rowIndex] = [firstColumn, "", "", null, entry.label, entry.value];
       });
 
       edits.push(...fillTableRequests(services.table, values));
