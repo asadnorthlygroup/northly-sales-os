@@ -8,11 +8,12 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Sparkles, TrendingUp, Clock, CheckCircle, XCircle,
-  ChevronDown, Receipt, Link2, UserCircle,
+  ChevronDown, Receipt, Link2, UserCircle, FileText,
 } from "lucide-react";
 import { AppNav } from "@/components/ui/app-nav";
 import { formatCurrency } from "@/lib/pricing";
 import InvoiceModal from "@/components/deals/InvoiceModal";
+import GenerateDocumentsModal from "@/components/deals/GenerateDocumentsModal";
 import ClientProfileDrawer from "@/components/deals/ClientProfileDrawer";
 import { computeDealQuality } from "@/lib/deal-quality";
 
@@ -39,6 +40,33 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.
 
 const STATUS_ORDER = ["draft", "proposal_sent", "negotiating", "won", "lost", "stalled"];
 const STATUSES = ["draft", "proposal_sent", "negotiating", "won", "lost", "stalled"];
+
+/**
+ * Turns a deal's proposal into the lines both documents are built from.
+ * Uses the lowest priced option that has a value, matching how the invoice
+ * modal picks its default, and names the pages the campaign runs on.
+ */
+function buildDocumentLines(deal: Deal) {
+  const ladder = deal.proposals?.[0]?.ladder_data ?? {};
+  const handles = deal.proposals?.[0]?.selected_accounts ?? [];
+
+  const option = [2, 3, 4, 5]
+    .map((n) => ({ n, price: ladder[`option${n}Price`] ?? 0 }))
+    .find((o) => o.price > 0);
+
+  if (!option) return [];
+
+  const pages = handles.length > 0 ? `\nPages: ${handles.join(", ")}` : "";
+
+  return [
+    {
+      item: deal.title || "Northly Group Campaign",
+      description: `Northly Group Marketing Package — Option ${option.n}${pages}`,
+      quantity: 1,
+      unitPrice: option.price,
+    },
+  ];
+}
 
 function StatusDropdown({
   dealId,
@@ -104,6 +132,7 @@ export default function DealsPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
   const [invoiceDeal, setInvoiceDeal] = useState<Deal | null>(null);
+  const [documentsDeal, setDocumentsDeal] = useState<Deal | null>(null);
   const [qbBanner, setQbBanner] = useState<"connected" | "error" | null>(null);
   const [profileClientId, setProfileClientId] = useState<string | null>(null);
 
@@ -305,13 +334,23 @@ export default function DealsPage() {
                         </td>
                         <td className="px-4 py-3">
                           {hasProposal && (
-                            <button
-                              onClick={() => setInvoiceDeal(deal)}
-                              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-[#2CA01C] border border-[#2CA01C]/30 rounded-lg hover:bg-green-50 transition-colors whitespace-nowrap"
-                            >
-                              <Receipt className="h-3 w-3" />
-                              Invoice
-                            </button>
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                onClick={() => setDocumentsDeal(deal)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-white bg-[#E8192C] rounded-lg hover:bg-[#c81525] transition-colors whitespace-nowrap"
+                              >
+                                <FileText className="h-3 w-3" />
+                                Agreement + Invoice
+                              </button>
+                              <button
+                                onClick={() => setInvoiceDeal(deal)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-[#2CA01C] border border-[#2CA01C]/30 rounded-lg hover:bg-green-50 transition-colors whitespace-nowrap"
+                                title="Create only a QuickBooks invoice"
+                              >
+                                <Receipt className="h-3 w-3" />
+                                Invoice only
+                              </button>
+                            </div>
                           )}
                         </td>
                       </tr>
@@ -323,6 +362,17 @@ export default function DealsPage() {
           </Card>
         )}
       </div>
+
+      {/* Agreement + invoice, generated together */}
+      {documentsDeal && (
+        <GenerateDocumentsModal
+          dealId={documentsDeal.id}
+          clientCompany={documentsDeal.clients?.company_name ?? "Client"}
+          campaignTitle={documentsDeal.title ?? "Campaign"}
+          lines={buildDocumentLines(documentsDeal)}
+          onClose={() => setDocumentsDeal(null)}
+        />
+      )}
 
       {/* Invoice modal */}
       {invoiceDeal && (
