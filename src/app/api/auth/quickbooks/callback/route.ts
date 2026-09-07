@@ -23,6 +23,13 @@ export async function GET(request: NextRequest) {
     return redirectAndClear(`${errorPath}${errorPath.includes("?") ? "&" : "?"}error=qb_no_code`);
   }
 
+  // Northly has more than one company under the same Intuit login. Falling back
+  // to a configured realm here would silently connect the wrong books, so a
+  // missing realm is an error rather than a guess.
+  if (!realmId) {
+    return redirectAndClear(`${errorPath}${errorPath.includes("?") ? "&" : "?"}error=qb_no_realm`);
+  }
+
   const creds = Buffer.from(
     `${process.env.QUICKBOOKS_CLIENT_ID}:${process.env.QUICKBOOKS_CLIENT_SECRET}`
   ).toString("base64");
@@ -59,7 +66,7 @@ export async function GET(request: NextRequest) {
       id: 1,
       access_token: t.access_token,
       refresh_token: t.refresh_token,
-      realm_id: realmId ?? process.env.QUICKBOOKS_REALM_ID!,
+      realm_id: realmId,
       expires_at: new Date(Date.now() + t.expires_in * 1000).toISOString(),
       updated_at: new Date().toISOString(),
     },

@@ -99,3 +99,28 @@ export async function qbVerifyConnection(): Promise<{ ok: boolean; realmId?: str
     return { ok: false, environment, detail: err instanceof Error ? err.message : String(err) };
   }
 }
+
+/**
+ * The name of the connected QuickBooks company.
+ *
+ * Northly has more than one company under the same Intuit login, and invoices
+ * must land in "Northly Group (WAVEROOMTV INC.)". Showing the name makes a
+ * wrong connection obvious instead of something you find out from an invoice.
+ */
+export async function qbCompanyName(): Promise<string | null> {
+  try {
+    const res = await qbFetch(
+      `/query?query=${encodeURIComponent("SELECT * FROM CompanyInfo")}&minorversion=70`
+    );
+    if (!res.ok) return null;
+    const info = (await res.json())?.QueryResponse?.CompanyInfo?.[0];
+    return info?.CompanyName ?? info?.LegalName ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** True when the connected company is an Intuit sandbox, not real books. */
+export function looksLikeSandboxCompany(name: string | null): boolean {
+  return Boolean(name && /sandbox/i.test(name));
+}

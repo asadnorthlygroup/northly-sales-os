@@ -101,6 +101,14 @@ export default function GenerateDocumentsModal({
   const [error, setError] = useState("");
   const [result, setResult] = useState<SuccessResult | null>(null);
   const [copied, setCopied] = useState<"subject" | "body" | null>(null);
+  const [qb, setQb] = useState<{ connected: boolean; companyName?: string | null; isSandbox?: boolean } | null>(null);
+
+  useEffect(() => {
+    fetch("/api/auth/quickbooks/status")
+      .then((r) => r.json())
+      .then(setQb)
+      .catch(() => setQb({ connected: false }));
+  }, []);
 
   async function copy(text: string, which: "subject" | "body") {
     try {
@@ -311,6 +319,33 @@ export default function GenerateDocumentsModal({
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
+              {qb && !qb.connected && (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800">
+                  <div className="font-medium">QuickBooks is not connected</div>
+                  <a href="/api/auth/quickbooks?return_to=/deals" className="text-xs underline">
+                    Connect QuickBooks →
+                  </a>
+                </div>
+              )}
+              {qb?.connected && (
+                <div
+                  className={
+                    "p-3 rounded-xl text-sm border " +
+                    (qb.isSandbox
+                      ? "bg-amber-50 border-amber-200 text-amber-800"
+                      : "bg-slate-50 border-slate-200 text-slate-600")
+                  }
+                >
+                  <span className="text-xs">Invoicing into </span>
+                  <span className="text-xs font-semibold">{qb.companyName ?? "unknown company"}</span>
+                  {qb.isSandbox && (
+                    <p className="text-xs mt-1">
+                      This is an Intuit sandbox, not your real books. Nothing created here reaches
+                      a client or your accounts.
+                    </p>
+                  )}
+                </div>
+              )}
               <div className="bg-slate-50 rounded-xl p-3 text-sm">
                 <div className="font-medium text-slate-900">{clientCompany}</div>
                 <div className="text-slate-500 text-xs mt-0.5">
