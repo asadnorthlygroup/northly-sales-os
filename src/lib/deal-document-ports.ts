@@ -13,6 +13,7 @@ import {
   fetchInvoicePdf,
   fetchPaymentLink,
   findOrCreateCustomer,
+  resolveTaxCodes,
   getInvoice,
 } from "./qbo-invoice";
 import { generateAgreement, exportAgreementPdf } from "./agreement-doc";
@@ -53,8 +54,12 @@ export const qboPort: QboPort = {
   },
 
   async createInvoice(input, customerId, totals) {
+    // Resolved from the live company file: tax code ids differ per company,
+    // and Canadian QuickBooks rejects lines without a real one.
+    const taxCodes = await resolveTaxCodes(input.clientProvince);
     return createInvoice({
       customerId,
+      taxCodes,
       clientEmail: input.clientEmail,
       invoiceDate: input.invoiceDate,
       dueDate: input.dueDate,

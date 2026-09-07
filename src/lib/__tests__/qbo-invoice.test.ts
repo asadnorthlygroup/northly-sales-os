@@ -22,6 +22,7 @@ const chequeTotals = computeInvoiceTotals({
 
 const params = (totals = oakberryTotals) => ({
   customerId: "cust-1",
+  taxCodes: { standard: "5", zeroRated: "3" },
   clientEmail: "carter@snowbank.capital",
   invoiceDate: "2026-09-03",
   dueDate: "2026-09-03",
@@ -64,7 +65,7 @@ describe("buildInvoicePayload", () => {
     const fee = lines.find((l) => l.Description.includes("processing fee"));
     expect(fee).toBeDefined();
     expect(fee!.Amount).toBe(67.8);
-    expect(fee!.SalesItemLineDetail.TaxCodeRef.value).toBe("NON");
+    expect(fee!.SalesItemLineDetail.TaxCodeRef.value).toBe("3");
   });
 
   it("omits the fee line entirely for a cheque deal", () => {
@@ -72,30 +73,16 @@ describe("buildInvoicePayload", () => {
     expect(lines.find((l) => l.Description.includes("processing fee"))).toBeUndefined();
   });
 
-  it("marks zero-rated lines NON and standard lines TAX", () => {
+  it("uses the company file's real tax code ids, not US shortcuts", () => {
     const lines = linesOf(buildInvoicePayload(params()));
-    expect(lines[0].SalesItemLineDetail.TaxCodeRef.value).toBe("TAX");
-    expect(lines[3].SalesItemLineDetail.TaxCodeRef.value).toBe("NON");
+    expect(lines[0].SalesItemLineDetail.TaxCodeRef.value).toBe("5");
+    expect(lines[3].SalesItemLineDetail.TaxCodeRef.value).toBe("3");
   });
 
   it("multiplies quantity by unit price for the line amount", () => {
     const lines = linesOf(buildInvoicePayload(params()));
     expect(lines[0].Amount).toBe(1150);
     expect(lines[0].SalesItemLineDetail.Qty).toBe(1);
-  });
-
-  it("takes the tax from the engine, not from a rate it recomputes", () => {
-    const payload = buildInvoicePayload(params()) as Record<string, { TotalTax: number; TaxLine: { TaxLineDetail: { TaxPercent: number; NetAmountTaxable: number } }[] }>;
-    const detail = payload.TxnTaxDetail;
-    expect(detail.TotalTax).toBe(260);
-    expect(detail.TaxLine[0].TaxLineDetail.NetAmountTaxable).toBe(2000);
-    expect(detail.TaxLine[0].TaxLineDetail.TaxPercent).toBeCloseTo(13, 6);
-  });
-
-  it("excludes the zero-rated fee from the taxable base", () => {
-    const payload = buildInvoicePayload(params()) as Record<string, { TaxLine: { TaxLineDetail: { NetAmountTaxable: number } }[] }>;
-    // $2,000 taxable, not $2,063 — the fee is never taxed.
-    expect(payload.TxnTaxDetail.TaxLine[0].TaxLineDetail.NetAmountTaxable).toBe(2000);
   });
 
   it("enables online card payment only when a fee is charged", () => {
@@ -115,20 +102,22 @@ describe("buildInvoicePayload", () => {
     expect(lines.find((l) => l.DetailType === "DiscountLineDetail")).toBeUndefined();
   });
 
-  it("sums to the total the engine computed", () => {
-    // This is what reconciliation compares. If it drifts, every deal fails.
-    const payload = buildInvoicePayload(params());
-    const lines = linesOf(payload) as unknown as { Amount: number; DetailType: string }[];
-    const net = lines.reduce(
-      (s, l) => s + (l.DetailType === "DiscountLineDetail" ? -l.Amount : l.Amount),
-      0
-    );
-    const tax = (payload.TxnTaxDetail as { TotalTax: number }).TotalTax;
-    expect(net + tax).toBeCloseTo(2327.8, 2);
-  });
-
   it("omits BillEmail when no client email is given", () => {
     const payload = buildInvoicePayload({ ...params(), clientEmail: undefined });
     expect(payload.BillEmail).toBeUndefined();
+  });
+});
+
+describe("transaction tax code", () => {
+  it("sets the province code at transaction level and lets QuickBooks compute", () => {
+    // Canadian QuickBooks rejects an invoice whose lines carry no real tax
+    // code: "Make sure all your transactions have a GST/HST rate" (6000).
+    const payload = buildInvoicePayload(params()) as Record<string, { TxnTaxCodeRef: { value: string } }>;
+    expect(payload.TxnTaxDetail.TxnTaxCodeRef.value).toBe("5");
+  });
+
+  it("does not hand-build a tax line, so QuickBooks own total can be reconciled", () => {
+    const payload = buildInvoicePayload(params()) as Record<string, Record<string, unknown>>;
+    expect(payload.TxnTaxDetail.TaxLine).toBeUndefined();
   });
 });

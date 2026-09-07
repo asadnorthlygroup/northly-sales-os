@@ -7,7 +7,13 @@
  */
 
 import { qbFetch } from "./quickbooks";
-import { centsToDollars, type InvoiceTotals } from "./invoice-pricing";
+import { centsToDollars, type InvoiceTotals, type Province } from "./invoice-pricing";
+import {
+  assertAutoNumbering,
+  fetchTaxCodes,
+  taxCodeForProvince,
+  zeroRatedTaxCode,
+} from "./qbo-tax-codes";
 
 /** Escapes a value for a QuickBooks query string literal. */
 export function escapeQboLiteral(value: string): string {
@@ -94,8 +100,16 @@ export interface InvoiceLineSpec {
   zeroRated: boolean;
 }
 
+export interface TaxCodeIds {
+  /** The province tax code applied to standard-rated lines. */
+  standard: string;
+  /** The code applied to zero-rated lines and the processing fee. */
+  zeroRated: string;
+}
+
 export interface CreateInvoiceParams {
   customerId: string;
+  taxCodes: TaxCodeIds;
   clientEmail?: string;
   invoiceDate: string;
   dueDate: string;
@@ -119,7 +133,7 @@ export function buildInvoicePayload(params: CreateInvoiceParams): Record<string,
       ItemRef: { value: "1", name: "Services" },
       UnitPrice: centsToDollars(line.unitPriceCents),
       Qty: line.quantity,
-      TaxCodeRef: { value: line.zeroRated ? "NON" : "TAX" },
+      TaxCodeRef: { value: line.zeroRated ? params.taxCodes.zeroRated : params.taxCodes.standard },
     },
   }));
 
@@ -133,7 +147,7 @@ export function buildInvoicePayload(params: CreateInvoiceParams): Record<string,
         ItemRef: { value: "1", name: "Services" },
         UnitPrice: centsToDollars(totals.feeCents),
         Qty: 1,
-        TaxCodeRef: { value: "NON" },
+        TaxCodeRef: { value: params.taxCodes.zeroRated },
       },
     });
   }
@@ -150,36 +164,36 @@ export function buildInvoicePayload(params: CreateInvoiceParams): Record<string,
     });
   }
 
-  const taxPercent =
-    totals.taxableBaseCents > 0 ? (totals.taxCents / totals.taxableBaseCents) * 100 : 0;
-
   return {
     CustomerRef: { value: params.customerId },
     TxnDate: params.invoiceDate,
     DueDate: params.dueDate,
     Line: lines,
-    TxnTaxDetail: {
-      TotalTax: centsToDollars(totals.taxCents),
-      TaxLine: [
-        {
-          Amount: centsToDollars(totals.taxCents),
-          DetailType: "TaxLineDetail",
-          TaxLineDetail: {
-            TaxRateRef: { value: "1" },
-            PercentBased: true,
-            TaxPercent: taxPercent,
-            NetAmountTaxable: centsToDollars(totals.taxableBaseCents),
-          },
-        },
-      ],
-    },
+    // QuickBooks computes the tax from these codes. The reconciliation gate
+    // then checks its total against the engine, so a company file configured
+    // at a different rate fails loudly instead of quietly billing the client
+    // a different amount from the agreement.
+    TxnTaxDetail: { TxnTaxCodeRef: { value: params.taxCodes.standard } },
     CustomerMemo: { value: params.memo },
     ...(params.clientEmail ? { BillEmail: { Address: params.clientEmail } } : {}),
     AllowOnlineCreditCardPayment: totals.feeCents > 0,
   };
 }
 
+/** Reads the company file and resolves the codes this province needs. */
+export async function resolveTaxCodes(province: Province): Promise<TaxCodeIds> {
+  const codes = await fetchTaxCodes();
+  return {
+    standard: taxCodeForProvince(province, codes).id,
+    zeroRated: zeroRatedTaxCode(codes).id,
+  };
+}
+
 export async function createInvoice(params: CreateInvoiceParams): Promise<QboInvoiceSummary> {
+  // Checked first: an invoice QuickBooks will not number is useless to us, and
+  // creating one anyway leaves a stray transaction to clean up.
+  await assertAutoNumbering();
+
   const res = await qbFetch("/invoice?minorversion=70", {
     method: "POST",
     body: JSON.stringify(buildInvoicePayload(params)),
@@ -193,9 +207,16 @@ export async function createInvoice(params: CreateInvoiceParams): Promise<QboInv
   }
 
   const inv = (await res.json()).Invoice;
+  if (!inv.DocNumber) {
+    throw new Error(
+      `QuickBooks created invoice ${inv.Id} but assigned no number, so the agreement ` +
+        "cannot reference it. Void it in QuickBooks and check that custom transaction " +
+        "numbers are turned off."
+    );
+  }
   return {
     qboInvoiceId: inv.Id,
-    invoiceNumber: inv.DocNumber,
+    invoiceNumber: String(inv.DocNumber),
     totalCents: Math.round(Number(inv.TotalAmt) * 100),
     qboUrl: invoiceUrl(inv.Id),
   };
