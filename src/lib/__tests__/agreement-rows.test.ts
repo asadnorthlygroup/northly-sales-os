@@ -92,16 +92,16 @@ describe("serviceRows", () => {
 describe("summaryRows", () => {
   it("shows the processing fee so the agreement total matches the invoice", () => {
     // This is the Oakberry defect: the client signed $2,100.00 while the
-    // invoice billed $2,163.00, because the fee was invoice-only.
+    // invoice billed $2,327.80, because the fee was invoice-only.
     const rows = summaryRows(oakberryTotals);
     const labels = rows.map((r) => r.label);
     expect(labels).toContain("Processing Fee 3% (zero-rated)");
 
     const fee = rows.find((r) => r.label.startsWith("Processing Fee"))!;
-    expect(fee.value).toBe("$63.00");
+    expect(fee.value).toBe("$67.80");
 
     const total = rows.find((r) => r.label === "Total")!;
-    expect(total.value).toBe("$2,163.00");
+    expect(total.value).toBe("$2,327.80");
   });
 
   it("shows the discount as a saving when there is one", () => {
@@ -168,6 +168,6 @@ describe("surplusItemRowCount", () => {
 
 describe("agreementTotalDollars", () => {
   it("returns the figure QuickBooks is reconciled against", () => {
-    expect(agreementTotalDollars(oakberryTotals)).toBe(2163);
+    expect(agreementTotalDollars(oakberryTotals)).toBe(2327.8);
   });
 });

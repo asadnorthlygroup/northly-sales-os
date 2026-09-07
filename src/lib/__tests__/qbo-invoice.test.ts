@@ -63,7 +63,7 @@ describe("buildInvoicePayload", () => {
     const lines = linesOf(buildInvoicePayload(params()));
     const fee = lines.find((l) => l.Description.includes("processing fee"));
     expect(fee).toBeDefined();
-    expect(fee!.Amount).toBe(63);
+    expect(fee!.Amount).toBe(67.8);
     expect(fee!.SalesItemLineDetail.TaxCodeRef.value).toBe("NON");
   });
 
@@ -87,9 +87,9 @@ describe("buildInvoicePayload", () => {
   it("takes the tax from the engine, not from a rate it recomputes", () => {
     const payload = buildInvoicePayload(params()) as Record<string, { TotalTax: number; TaxLine: { TaxLineDetail: { TaxPercent: number; NetAmountTaxable: number } }[] }>;
     const detail = payload.TxnTaxDetail;
-    expect(detail.TotalTax).toBe(100);
+    expect(detail.TotalTax).toBe(260);
     expect(detail.TaxLine[0].TaxLineDetail.NetAmountTaxable).toBe(2000);
-    expect(detail.TaxLine[0].TaxLineDetail.TaxPercent).toBeCloseTo(5, 6);
+    expect(detail.TaxLine[0].TaxLineDetail.TaxPercent).toBeCloseTo(13, 6);
   });
 
   it("excludes the zero-rated fee from the taxable base", () => {
@@ -124,7 +124,7 @@ describe("buildInvoicePayload", () => {
       0
     );
     const tax = (payload.TxnTaxDetail as { TotalTax: number }).TotalTax;
-    expect(net + tax).toBeCloseTo(2163, 2);
+    expect(net + tax).toBeCloseTo(2327.8, 2);
   });
 
   it("omits BillEmail when no client email is given", () => {

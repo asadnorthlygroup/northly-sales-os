@@ -88,8 +88,8 @@ maybe("agreement generation against the live template", () => {
     // The numbers that matter, straight out of the rendered document.
     expect(flat).toContain("1820");
     expect(flat).toContain("Carter Friesen");
-    expect(flat).toContain("$63.00");
-    expect(flat).toContain("$2,163.00");
+    expect(flat).toContain("$67.80");
+    expect(flat).toContain("$2,327.80");
     expect(flat).toContain("@northlywindsor");
 
     // Story Services and the Billing schedule are dropped for this deal.

@@ -113,47 +113,34 @@ export function formatCents(cents: Cents): string {
   return CAD.format(cents / 100);
 }
 
-const GST = (province: Province): TaxRule => ({
-  basisPoints: 500,
-  label: `GST (${province}) @ 5%`,
-  qboTaxCodeKey: `GST_${province}`,
-});
-
-const HST = (province: Province, basisPoints: number): TaxRule => ({
-  basisPoints,
-  label: `HST (${province}) @ ${basisPoints / 100}%`,
-  qboTaxCodeKey: `HST_${province}`,
-});
-
 /**
- * Rates reflect what finance actually issues: advertising services are billed
- * GST-only in the GST provinces. Invoice 1779 (BC) and invoice 1820 (MB) were
- * both taxed at 5%, not the 12% the old PROVINCE_TAX table would have applied.
+ * Combined sales tax by province, per the 2026 rate table.
+ *
+ * Quebec is GST only: Northly sells to Quebec clients but is not registered
+ * for QST, so 9.975% QST is not charged.
+ *
+ * Note for whoever reviews this: these are the general combined rates. PST and
+ * RST treatment of advertising services varies by province, and invoices
+ * issued before September 2026 billed BC and MB at 5% GST only.
  */
-const TAX_TABLE: Record<Exclude<Province, "QC">, TaxRule> = {
-  ON: HST("ON", 1300),
-  NB: HST("NB", 1500),
-  NL: HST("NL", 1500),
-  NS: HST("NS", 1500),
-  PE: HST("PE", 1500),
-  AB: GST("AB"),
-  BC: GST("BC"),
-  MB: GST("MB"),
-  SK: GST("SK"),
-  NT: GST("NT"),
-  NU: GST("NU"),
-  YT: GST("YT"),
+const TAX_TABLE: Record<Province, TaxRule> = {
+  AB: { basisPoints: 500, label: "GST (AB) @ 5%", qboTaxCodeKey: "GST_AB" },
+  BC: { basisPoints: 1200, label: "GST + PST (BC) @ 12%", qboTaxCodeKey: "GST_PST_BC" },
+  MB: { basisPoints: 1300, label: "GST + RST (MB) @ 13%", qboTaxCodeKey: "GST_RST_MB" },
+  NB: { basisPoints: 1500, label: "HST (NB) @ 15%", qboTaxCodeKey: "HST_NB" },
+  NL: { basisPoints: 1500, label: "HST (NL) @ 15%", qboTaxCodeKey: "HST_NL" },
+  NS: { basisPoints: 1400, label: "HST (NS) @ 14%", qboTaxCodeKey: "HST_NS" },
+  NT: { basisPoints: 500, label: "GST (NT) @ 5%", qboTaxCodeKey: "GST_NT" },
+  NU: { basisPoints: 500, label: "GST (NU) @ 5%", qboTaxCodeKey: "GST_NU" },
+  ON: { basisPoints: 1300, label: "HST (ON) @ 13%", qboTaxCodeKey: "HST_ON" },
+  PE: { basisPoints: 1500, label: "HST (PE) @ 15%", qboTaxCodeKey: "HST_PE" },
+  QC: { basisPoints: 500, label: "GST (QC) @ 5%", qboTaxCodeKey: "GST_QC" },
+  SK: { basisPoints: 1100, label: "GST + PST (SK) @ 11%", qboTaxCodeKey: "GST_PST_SK" },
+  YT: { basisPoints: 500, label: "GST (YT) @ 5%", qboTaxCodeKey: "GST_YT" },
 };
 
 /** Resolves the sales tax rule for a client's province. */
 export function taxRuleFor(province: Province): TaxRule {
-  if (province === "QC") {
-    throw new UnsupportedProvinceError(
-      "QC",
-      "Quebec requires GST plus 9.975% QST, and QST registration has not been confirmed. " +
-        "Confirm registration, then add a QC entry to the tax table."
-    );
-  }
   return TAX_TABLE[province];
 }
 

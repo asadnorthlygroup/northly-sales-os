@@ -76,7 +76,7 @@ function makePorts(options: { existingInvoiceId?: string | null; qboTotalCents?:
         },
         async getInvoice(id) {
           calls.push("getInvoice");
-          return invoice(id, options.qboTotalCents ?? 216_300);
+          return invoice(id, options.qboTotalCents ?? 232_780);
         },
         async fetchInvoicePdf() {
           calls.push("fetchInvoicePdf");
@@ -132,7 +132,7 @@ describe("toPricingInput", () => {
   });
 
   it("reproduces the Oakberry total end to end", () => {
-    expect(computeInvoiceTotals(toPricingInput(oakberry())).totalCents).toBe(216_300);
+    expect(computeInvoiceTotals(toPricingInput(oakberry())).totalCents).toBe(232_780);
   });
 });
 
@@ -156,7 +156,7 @@ describe("generateDealDocuments", () => {
     expect(result.agreementDocumentId).toBe("doc-1");
     expect(result.qboInvoiceId).toBe("qbo-new");
     expect(result.draftId).toBe("draft-1");
-    expect(result.totals.totalCents).toBe(216_300);
+    expect(result.totals.totalCents).toBe(232_780);
   });
 
   it("drafts the email but never sends it", async () => {
@@ -184,7 +184,7 @@ describe("generateDealDocuments", () => {
   });
 
   it("blocks when QuickBooks and the agreement disagree", async () => {
-    // QuickBooks records $2,100.00 while the engine computed $2,163.00 —
+    // QuickBooks records $2,100.00 while the engine computed $2,327.80 —
     // exactly the Oakberry gap.
     const r = makePorts({ qboTotalCents: 210_000 });
     await expect(generateDealDocuments(oakberry(), r.ports)).rejects.toThrow(
@@ -204,7 +204,7 @@ describe("generateDealDocuments", () => {
     await expect(generateDealDocuments(oakberry(), r.ports)).rejects.toThrow();
     const failure = r.events.find((e) => e.action === "reconciliation_failed");
     expect(failure).toBeDefined();
-    expect(failure!.payload).toMatchObject({ expectedCents: 216_300, actualCents: 210_000 });
+    expect(failure!.payload).toMatchObject({ expectedCents: 232_780, actualCents: 210_000 });
   });
 
   it("does not fetch a payment link for an e-transfer deal", async () => {
@@ -236,7 +236,7 @@ describe("draftBody", () => {
   });
 
   it("quotes the total the client will actually be charged", () => {
-    expect(draftBody(oakberry(), totals, "https://pay")).toContain("$2,163.00");
+    expect(draftBody(oakberry(), totals, "https://pay")).toContain("$2,327.80");
   });
 
   it("gives card payers the payment link and no e-transfer address", () => {
@@ -312,7 +312,7 @@ describe("when the email draft cannot be created", () => {
     const result = await generateDealDocuments(oakberry(), r.ports);
     expect(result.emailSubject).toContain("Invoice + Agreement");
     expect(result.emailBody).toContain("Hey Carter,");
-    expect(result.emailBody).toContain("$2,163.00");
+    expect(result.emailBody).toContain("$2,327.80");
   });
 });
 
@@ -321,7 +321,7 @@ describe("the email text", () => {
     const r = makePorts();
     const result = await generateDealDocuments(oakberry(), r.ports);
     expect(result.draftId).toBe("draft-1");
-    expect(result.emailBody).toContain("$2,163.00");
+    expect(result.emailBody).toContain("$2,327.80");
   });
 
   it("matches exactly what the Gmail draft would contain", async () => {

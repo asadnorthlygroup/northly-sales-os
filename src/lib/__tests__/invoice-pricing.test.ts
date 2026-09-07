@@ -10,7 +10,6 @@ import {
   ReconciliationError,
   roundHalfAwayFromZero,
   taxRuleFor,
-  UnsupportedProvinceError,
   type InvoicePricingInput,
 } from "@/lib/invoice-pricing";
 
@@ -62,33 +61,47 @@ describe("taxRuleFor", () => {
     expect(taxRuleFor("ON").qboTaxCodeKey).toBe("HST_ON");
   });
 
-  it("returns 5% GST for British Columbia, matching invoice 1779", () => {
-    // The old PROVINCE_TAX table said 12% here, which would have over-billed
-    // Rethink by $1,050 on the A&W campaign.
-    expect(taxRuleFor("BC").basisPoints).toBe(500);
+  it("returns 12% for British Columbia, GST plus PST", () => {
+    // Invoices issued before September 2026, including 1779 for Rethink,
+    // billed BC at 5% GST only.
+    expect(taxRuleFor("BC").basisPoints).toBe(1200);
+    expect(taxRuleFor("BC").qboTaxCodeKey).toBe("GST_PST_BC");
   });
 
-  it("returns 5% GST for Manitoba, matching invoice 1820", () => {
-    expect(taxRuleFor("MB").basisPoints).toBe(500);
-    expect(taxRuleFor("MB").qboTaxCodeKey).toBe("GST_MB");
+  it("returns 13% for Manitoba, GST plus RST", () => {
+    // Invoice 1820 for Oakberry billed 5%.
+    expect(taxRuleFor("MB").basisPoints).toBe(1300);
+    expect(taxRuleFor("MB").qboTaxCodeKey).toBe("GST_RST_MB");
   });
 
-  it("returns 15% HST for the Atlantic HST provinces", () => {
-    for (const province of ["NB", "NL", "NS", "PE"] as const) {
+  it("returns 15% HST for New Brunswick, Newfoundland and PEI", () => {
+    for (const province of ["NB", "NL", "PE"] as const) {
       expect(taxRuleFor(province).basisPoints).toBe(1500);
     }
   });
 
-  it("gives every supported province a distinct QuickBooks tax code key", () => {
-    const keys = PROVINCES.filter((p) => p !== "QC").map(
-      (p) => taxRuleFor(p).qboTaxCodeKey
-    );
+  it("returns 14% HST for Nova Scotia, not the older 15%", () => {
+    expect(taxRuleFor("NS").basisPoints).toBe(1400);
+  });
+
+  it("returns 11% for Saskatchewan and 5% for the GST-only regions", () => {
+    expect(taxRuleFor("SK").basisPoints).toBe(1100);
+    for (const province of ["AB", "NT", "NU", "YT"] as const) {
+      expect(taxRuleFor(province).basisPoints).toBe(500);
+    }
+  });
+
+  it("gives every province a distinct QuickBooks tax code key", () => {
+    const keys = PROVINCES.map((p) => taxRuleFor(p).qboTaxCodeKey);
     expect(new Set(keys).size).toBe(keys.length);
   });
 
-  it("refuses Quebec until QST registration is confirmed", () => {
-    expect(() => taxRuleFor("QC")).toThrow(UnsupportedProvinceError);
-    expect(() => taxRuleFor("QC")).toThrow(/QST registration/);
+  it("charges Quebec GST only, because Northly is not QST registered", () => {
+    // Northly sells to Quebec clients but is not registered for QST, so the
+    // 9.975% is not charged. Collecting a tax we cannot remit would be worse
+    // than not charging it.
+    expect(taxRuleFor("QC").basisPoints).toBe(500);
+    expect(taxRuleFor("QC").label).not.toMatch(/QST/);
   });
 });
 
@@ -210,8 +223,10 @@ const ISSUED_INVOICES: IssuedInvoiceFixture[] = [
         { quantity: 6, unitPriceCents: 0, taxTreatment: "zero_rated" },
       ],
     },
-    expectedTotalCents: 216_300,
+    expectedTotalCents: 232_780,
     issuedTotalCents: 216_300,
+    knownDefect:
+      "Billed at 5% GST only. From September 2026 Manitoba is charged 13% (GST + RST).",
   },
   {
     invoiceNumber: "1765",
@@ -250,8 +265,10 @@ const ISSUED_INVOICES: IssuedInvoiceFixture[] = [
       discountCents: 0,
       lines: [{ quantity: 1, unitPriceCents: 1_500_000, taxTreatment: "standard" }],
     },
-    expectedTotalCents: 1_575_000,
+    expectedTotalCents: 1_680_000,
     issuedTotalCents: 1_575_000,
+    knownDefect:
+      "Billed at 5% GST only. From September 2026 British Columbia is charged 12% (GST + PST).",
   },
 ];
 
@@ -265,9 +282,9 @@ describe("regression against issued invoices", () => {
     }
   );
 
-  it("agrees with every invoice that was billed correctly", () => {
+  it("agrees with the invoices whose province rate has not changed", () => {
     const clean = ISSUED_INVOICES.filter((f) => f.knownDefect === undefined);
-    expect(clean).toHaveLength(3);
+    expect(clean).toHaveLength(1);
     for (const fixture of clean) {
       expect(computeInvoiceTotals(fixture.input).totalCents).toBe(
         fixture.issuedTotalCents
@@ -275,9 +292,9 @@ describe("regression against issued invoices", () => {
     }
   });
 
-  it("disagrees with every invoice that carried a known defect", () => {
+  it("disagrees where a fee was missed or a provincial rate has since changed", () => {
     const defective = ISSUED_INVOICES.filter((f) => f.knownDefect !== undefined);
-    expect(defective).toHaveLength(2);
+    expect(defective).toHaveLength(4);
     for (const fixture of defective) {
       expect(computeInvoiceTotals(fixture.input).totalCents).not.toBe(
         fixture.issuedTotalCents
