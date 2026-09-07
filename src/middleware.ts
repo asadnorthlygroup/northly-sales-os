@@ -27,8 +27,16 @@ export async function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
-  // Public routes — no auth needed
-  const publicPaths = ["/login", "/auth/callback", "/api/auth/quickbooks/callback"];
+  // Public routes — no auth needed.
+  // /privacy and /terms must stay reachable without signing in: Intuit checks
+  // those URLs when issuing production keys, and a login redirect fails it.
+  const publicPaths = [
+    "/login",
+    "/auth/callback",
+    "/api/auth/quickbooks/callback",
+    "/privacy",
+    "/terms",
+  ];
   if (publicPaths.some((p) => pathname.startsWith(p))) {
     return supabaseResponse;
   }
