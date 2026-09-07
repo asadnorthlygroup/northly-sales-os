@@ -126,6 +126,12 @@ export interface DealDocumentsResult {
   draftLink: string | null;
   /** Why the draft failed, when it did. */
   draftError?: string;
+  /**
+   * The email text, always returned whether or not a Gmail draft was created.
+   * An AE can copy this into any mail client.
+   */
+  emailSubject: string;
+  emailBody: string;
   totals: InvoiceTotals;
   /** True when an existing invoice was reused rather than a new one created. */
   reusedInvoice: boolean;
@@ -253,6 +259,8 @@ export async function generateDealDocuments(
   // The invoice and the agreement already exist and are correct. A failure
   // here must not discard them, so the draft is best-effort and reported.
   const base = safeFilename(`${input.clientCompany} ${input.campaignTitle}`);
+  const subject = draftSubject(input);
+  const body = draftBody(input, totals, paymentLink);
   let draft: { draftId: string; webLink: string } | null = null;
   let draftError: string | undefined;
 
@@ -260,8 +268,8 @@ export async function generateDealDocuments(
     draft = await ports.mail.createDraft({
       to: input.clientEmail,
       aeEmail: input.aeEmail,
-      subject: draftSubject(input),
-      body: draftBody(input, totals, paymentLink),
+      subject,
+      body,
       attachments: [
         { filename: `Agreement - ${base}.pdf`, content: agreementPdf },
         { filename: `Invoice ${invoice.invoiceNumber}.pdf`, content: invoicePdf },
@@ -283,6 +291,8 @@ export async function generateDealDocuments(
   });
 
   return {
+    emailSubject: subject,
+    emailBody: body,
     invoiceNumber: invoice.invoiceNumber,
     qboInvoiceId: invoice.qboInvoiceId,
     qboUrl: invoice.qboUrl,

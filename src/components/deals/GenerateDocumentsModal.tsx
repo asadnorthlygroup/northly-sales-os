@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, FileText, ExternalLink, AlertCircle, Loader2, Check } from "lucide-react";
+import { X, FileText, ExternalLink, AlertCircle, Loader2, Check, Copy, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/pricing";
 import { loadBillingCache, saveBillingCache } from "@/lib/billing-cache";
@@ -44,6 +44,10 @@ interface SuccessResult {
   agreementLink: string;
   draftLink: string | null;
   draftError: string | null;
+  emailSubject: string;
+  emailBody: string;
+  agreementDownloadUrl: string;
+  invoiceDownloadUrl: string;
   reusedInvoice: boolean;
   total: number;
   processingFee: number;
@@ -96,6 +100,17 @@ export default function GenerateDocumentsModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState<SuccessResult | null>(null);
+  const [copied, setCopied] = useState<"subject" | "body" | null>(null);
+
+  async function copy(text: string, which: "subject" | "body") {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(which);
+      setTimeout(() => setCopied(null), 2000);
+    } catch {
+      setError("Could not copy. Select the text and copy it manually.");
+    }
+  }
 
   function set(key: string, value: string | number) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -212,42 +227,85 @@ export default function GenerateDocumentsModal({
                 </p>
               )}
 
-              <div className="space-y-2">
-                {result.draftLink ? (
-                  <a href={result.draftLink} target="_blank" rel="noreferrer"
-                     className="flex items-center justify-between border rounded-xl px-4 py-3 text-sm hover:bg-slate-50">
-                    <span className="font-medium">Open the email draft</span>
-                    <ExternalLink className="h-4 w-4 text-slate-400" />
+              {/* Step 1 — the two PDFs */}
+              <div>
+                <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+                  1 · Download both PDFs
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <a href={result.agreementDownloadUrl}
+                     className="flex items-center justify-center gap-2 border rounded-xl px-3 py-3 text-sm font-medium hover:bg-slate-50">
+                    <Download className="h-4 w-4 text-slate-400" />
+                    Agreement
                   </a>
-                ) : (
-                  <div className="border border-amber-200 bg-amber-50 rounded-xl px-4 py-3 text-sm text-amber-800">
-                    <div className="font-medium">No email draft was created</div>
-                    <p className="text-xs mt-1">
-                      Both documents were created correctly. Download them from the links below
-                      and attach them to your own email.
-                    </p>
-                    {result.draftError && (
-                      <p className="text-[11px] mt-1.5 text-amber-700">{result.draftError}</p>
-                    )}
-                  </div>
-                )}
-                <a href={result.agreementLink} target="_blank" rel="noreferrer"
-                   className="flex items-center justify-between border rounded-xl px-4 py-3 text-sm hover:bg-slate-50">
-                  <span>Agreement</span>
-                  <ExternalLink className="h-4 w-4 text-slate-400" />
-                </a>
-                <a href={result.qboUrl} target="_blank" rel="noreferrer"
-                   className="flex items-center justify-between border rounded-xl px-4 py-3 text-sm hover:bg-slate-50">
-                  <span>Invoice in QuickBooks</span>
-                  <ExternalLink className="h-4 w-4 text-slate-400" />
-                </a>
+                  <a href={result.invoiceDownloadUrl}
+                     className="flex items-center justify-center gap-2 border rounded-xl px-3 py-3 text-sm font-medium hover:bg-slate-50">
+                    <Download className="h-4 w-4 text-slate-400" />
+                    Invoice
+                  </a>
+                </div>
               </div>
 
-              <p className="text-xs text-slate-500">
-                {result.draftLink
-                  ? "Both PDFs are attached to the draft. Read it before you send — nothing has gone to the client yet."
-                  : "Nothing has gone to the client."}
-              </p>
+              {/* Step 2 — the message, ready to paste anywhere */}
+              <div>
+                <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+                  2 · Copy the message
+                </div>
+
+                <div className="border rounded-xl overflow-hidden">
+                  <div className="flex items-center justify-between gap-2 px-3 py-2 border-b bg-slate-50">
+                    <span className="text-xs text-slate-600 truncate">{result.emailSubject}</span>
+                    <button type="button" onClick={() => copy(result.emailSubject, "subject")}
+                            className="shrink-0 inline-flex items-center gap-1 text-xs font-medium text-slate-600 hover:text-slate-900">
+                      {copied === "subject" ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                      {copied === "subject" ? "Copied" : "Subject"}
+                    </button>
+                  </div>
+                  <textarea readOnly value={result.emailBody} rows={9}
+                            onFocus={(e) => e.currentTarget.select()}
+                            className="w-full px-3 py-2 text-xs font-mono leading-relaxed resize-y focus:outline-none" />
+                  <div className="px-3 py-2 border-t bg-slate-50">
+                    <button type="button" onClick={() => copy(result.emailBody, "body")}
+                            className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-slate-900">
+                      {copied === "body" ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                      {copied === "body" ? "Copied to clipboard" : "Copy message"}
+                    </button>
+                  </div>
+                </div>
+
+                <p className="text-[11px] text-slate-500 mt-1.5">
+                  Paste it into your own email, attach both PDFs, and send. The total and payment
+                  instructions above already match the invoice.
+                </p>
+              </div>
+
+              {result.draftLink && (
+                <a href={result.draftLink} target="_blank" rel="noreferrer"
+                   className="flex items-center justify-between border rounded-xl px-4 py-3 text-sm hover:bg-slate-50">
+                  <span className="font-medium">Or open the ready-made Gmail draft</span>
+                  <ExternalLink className="h-4 w-4 text-slate-400" />
+                </a>
+              )}
+
+              <details className="text-sm">
+                <summary className="cursor-pointer text-slate-500 text-xs hover:text-slate-700">
+                  Open the originals
+                </summary>
+                <div className="space-y-2 mt-2">
+                  <a href={result.agreementLink} target="_blank" rel="noreferrer"
+                     className="flex items-center justify-between border rounded-xl px-4 py-2.5 text-sm hover:bg-slate-50">
+                    <span>Agreement in Google Docs</span>
+                    <ExternalLink className="h-4 w-4 text-slate-400" />
+                  </a>
+                  <a href={result.qboUrl} target="_blank" rel="noreferrer"
+                     className="flex items-center justify-between border rounded-xl px-4 py-2.5 text-sm hover:bg-slate-50">
+                    <span>Invoice in QuickBooks</span>
+                    <ExternalLink className="h-4 w-4 text-slate-400" />
+                  </a>
+                </div>
+              </details>
+
+              <p className="text-xs text-slate-500">Nothing has gone to the client yet.</p>
 
               <Button onClick={onClose} className="w-full">Done</Button>
             </div>

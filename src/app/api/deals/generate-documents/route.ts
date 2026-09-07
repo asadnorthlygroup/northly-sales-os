@@ -134,6 +134,18 @@ export async function POST(request: NextRequest) {
       agreementLink: result.agreementLink,
       draftLink: result.draftLink,
       draftError: result.draftError ?? null,
+      emailSubject: result.emailSubject,
+      emailBody: result.emailBody,
+      agreementDownloadUrl:
+        "/api/deals/documents/download?kind=agreement&id=" +
+        encodeURIComponent(result.agreementDocumentId) +
+        "&name=" +
+        encodeURIComponent("Agreement - " + parsed.clientCompany),
+      invoiceDownloadUrl:
+        "/api/deals/documents/download?kind=invoice&id=" +
+        encodeURIComponent(result.qboInvoiceId) +
+        "&name=" +
+        encodeURIComponent("Invoice " + result.invoiceNumber),
       reusedInvoice: result.reusedInvoice,
       subtotal: centsToDollars(result.totals.subtotalCents),
       discount: centsToDollars(result.totals.discountCents),

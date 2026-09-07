@@ -304,4 +304,36 @@ describe("when the email draft cannot be created", () => {
     await generateDealDocuments(oakberry(), r.ports);
     expect(r.invoicesCreated).toBe(1);
   });
+
+  it("still returns the email text for the AE to copy", async () => {
+    // This is what makes Gmail optional: the AE always gets the message,
+    // with the right total and payment instructions, for any mail client.
+    const r = portsWithFailingMail();
+    const result = await generateDealDocuments(oakberry(), r.ports);
+    expect(result.emailSubject).toContain("Invoice + Agreement");
+    expect(result.emailBody).toContain("Hey Carter,");
+    expect(result.emailBody).toContain("$2,163.00");
+  });
+});
+
+describe("the email text", () => {
+  it("is returned whether or not a draft was created", async () => {
+    const r = makePorts();
+    const result = await generateDealDocuments(oakberry(), r.ports);
+    expect(result.draftId).toBe("draft-1");
+    expect(result.emailBody).toContain("$2,163.00");
+  });
+
+  it("matches exactly what the Gmail draft would contain", async () => {
+    const r = makePorts();
+    const result = await generateDealDocuments(oakberry(), r.ports);
+    expect(result.emailSubject).toBe(draftSubject(oakberry()));
+  });
+
+  it("carries e-transfer instructions for an e-transfer deal", async () => {
+    const r = makePorts();
+    const result = await generateDealDocuments(oakberry({ paymentMethod: "e_transfer" }), r.ports);
+    expect(result.emailBody).toContain("payments@waveroomtv.com");
+    expect(result.emailBody).not.toContain("credit card payment");
+  });
 });
