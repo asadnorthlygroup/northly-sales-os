@@ -133,6 +133,7 @@ export async function POST(request: NextRequest) {
       paymentLink: result.paymentLink,
       agreementLink: result.agreementLink,
       draftLink: result.draftLink,
+      draftError: result.draftError ?? null,
       reusedInvoice: result.reusedInvoice,
       subtotal: centsToDollars(result.totals.subtotalCents),
       discount: centsToDollars(result.totals.discountCents),

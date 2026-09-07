@@ -42,7 +42,8 @@ interface SuccessResult {
   qboUrl: string;
   paymentLink: string | null;
   agreementLink: string;
-  draftLink: string;
+  draftLink: string | null;
+  draftError: string | null;
   reusedInvoice: boolean;
   total: number;
   processingFee: number;
@@ -212,11 +213,24 @@ export default function GenerateDocumentsModal({
               )}
 
               <div className="space-y-2">
-                <a href={result.draftLink} target="_blank" rel="noreferrer"
-                   className="flex items-center justify-between border rounded-xl px-4 py-3 text-sm hover:bg-slate-50">
-                  <span className="font-medium">Open the email draft</span>
-                  <ExternalLink className="h-4 w-4 text-slate-400" />
-                </a>
+                {result.draftLink ? (
+                  <a href={result.draftLink} target="_blank" rel="noreferrer"
+                     className="flex items-center justify-between border rounded-xl px-4 py-3 text-sm hover:bg-slate-50">
+                    <span className="font-medium">Open the email draft</span>
+                    <ExternalLink className="h-4 w-4 text-slate-400" />
+                  </a>
+                ) : (
+                  <div className="border border-amber-200 bg-amber-50 rounded-xl px-4 py-3 text-sm text-amber-800">
+                    <div className="font-medium">No email draft was created</div>
+                    <p className="text-xs mt-1">
+                      Both documents were created correctly. Download them from the links below
+                      and attach them to your own email.
+                    </p>
+                    {result.draftError && (
+                      <p className="text-[11px] mt-1.5 text-amber-700">{result.draftError}</p>
+                    )}
+                  </div>
+                )}
                 <a href={result.agreementLink} target="_blank" rel="noreferrer"
                    className="flex items-center justify-between border rounded-xl px-4 py-3 text-sm hover:bg-slate-50">
                   <span>Agreement</span>
@@ -230,8 +244,9 @@ export default function GenerateDocumentsModal({
               </div>
 
               <p className="text-xs text-slate-500">
-                Both PDFs are attached to the draft. Read it before you send — nothing has gone to
-                the client yet.
+                {result.draftLink
+                  ? "Both PDFs are attached to the draft. Read it before you send — nothing has gone to the client yet."
+                  : "Nothing has gone to the client."}
               </p>
 
               <Button onClick={onClose} className="w-full">Done</Button>

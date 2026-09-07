@@ -121,8 +121,11 @@ export interface DealDocumentsResult {
   paymentLink: string | null;
   agreementDocumentId: string;
   agreementLink: string;
-  draftId: string;
-  draftLink: string;
+  /** Null when the draft could not be created. The documents still exist. */
+  draftId: string | null;
+  draftLink: string | null;
+  /** Why the draft failed, when it did. */
+  draftError?: string;
   totals: InvoiceTotals;
   /** True when an existing invoice was reused rather than a new one created. */
   reusedInvoice: boolean;
@@ -247,22 +250,35 @@ export async function generateDealDocuments(
   });
 
   // ---- draft, never sent -------------------------------------------------
+  // The invoice and the agreement already exist and are correct. A failure
+  // here must not discard them, so the draft is best-effort and reported.
   const base = safeFilename(`${input.clientCompany} ${input.campaignTitle}`);
-  const draft = await ports.mail.createDraft({
-    to: input.clientEmail,
-    aeEmail: input.aeEmail,
-    subject: draftSubject(input),
-    body: draftBody(input, totals, paymentLink),
-    attachments: [
-      { filename: `Agreement - ${base}.pdf`, content: agreementPdf },
-      { filename: `Invoice ${invoice.invoiceNumber}.pdf`, content: invoicePdf },
-    ],
-  });
+  let draft: { draftId: string; webLink: string } | null = null;
+  let draftError: string | undefined;
+
+  try {
+    draft = await ports.mail.createDraft({
+      to: input.clientEmail,
+      aeEmail: input.aeEmail,
+      subject: draftSubject(input),
+      body: draftBody(input, totals, paymentLink),
+      attachments: [
+        { filename: `Agreement - ${base}.pdf`, content: agreementPdf },
+        { filename: `Invoice ${invoice.invoiceNumber}.pdf`, content: invoicePdf },
+      ],
+    });
+  } catch (error) {
+    draftError = error instanceof Error ? error.message : "Could not create the email draft.";
+    await ports.store.recordEvent(input.dealId, "draft_failed", {
+      aeEmail: input.aeEmail,
+      reason: draftError,
+    });
+  }
 
   await ports.store.recordEvent(input.dealId, "documents_ready", {
     invoiceNumber: invoice.invoiceNumber,
     agreementDocId: agreement.documentId,
-    draftId: draft.draftId,
+    draftId: draft?.draftId ?? null,
     totalDollars: centsToDollars(totals.totalCents),
   });
 
@@ -273,8 +289,9 @@ export async function generateDealDocuments(
     paymentLink,
     agreementDocumentId: agreement.documentId,
     agreementLink: agreement.webViewLink,
-    draftId: draft.draftId,
-    draftLink: draft.webLink,
+    draftId: draft?.draftId ?? null,
+    draftLink: draft?.webLink ?? null,
+    draftError,
     totals,
     reusedInvoice,
   };

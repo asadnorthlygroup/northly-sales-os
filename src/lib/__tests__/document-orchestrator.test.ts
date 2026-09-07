@@ -258,3 +258,50 @@ describe("draftBody", () => {
     expect(body).toContain("payment link unavailable");
   });
 });
+
+describe("when the email draft cannot be created", () => {
+  /**
+   * AEs are on northlygroup.com while delegation is granted in the
+   * waveroomtv.com Workspace, so impersonation fails. The invoice and the
+   * agreement are already created and correct — losing them would be worse
+   * than losing the draft.
+   */
+  function portsWithFailingMail() {
+    const r = makePorts();
+    r.ports.mail = {
+      async createDraft() {
+        throw new Error(
+          "Client is unauthorized to retrieve access tokens using this method"
+        );
+      },
+    };
+    return r;
+  }
+
+  it("still returns the invoice and the agreement", async () => {
+    const r = portsWithFailingMail();
+    const result = await generateDealDocuments(oakberry(), r.ports);
+    expect(result.invoiceNumber).toBe("1820");
+    expect(result.agreementDocumentId).toBe("doc-1");
+  });
+
+  it("reports the draft as missing rather than pretending it exists", async () => {
+    const r = portsWithFailingMail();
+    const result = await generateDealDocuments(oakberry(), r.ports);
+    expect(result.draftId).toBeNull();
+    expect(result.draftLink).toBeNull();
+    expect(result.draftError).toMatch(/unauthorized/i);
+  });
+
+  it("records the failure for audit", async () => {
+    const r = portsWithFailingMail();
+    await generateDealDocuments(oakberry(), r.ports);
+    expect(r.events.map((e) => e.action)).toContain("draft_failed");
+  });
+
+  it("does not create a second invoice when the AE retries", async () => {
+    const r = portsWithFailingMail();
+    await generateDealDocuments(oakberry(), r.ports);
+    expect(r.invoicesCreated).toBe(1);
+  });
+});
