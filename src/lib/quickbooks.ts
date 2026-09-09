@@ -63,7 +63,7 @@ async function getValidToken(): Promise<{ access_token: string; realm_id: string
 
 export async function qbFetch(path: string, options: RequestInit = {}) {
   const { access_token, realm_id } = await getValidToken();
-  return fetch(`${QB_API_BASE}/${realm_id}${path}`, {
+  const res = await fetch(`${QB_API_BASE}/${realm_id}${path}`, {
     ...options,
     headers: {
       Authorization: `Bearer ${access_token}`,
@@ -72,6 +72,25 @@ export async function qbFetch(path: string, options: RequestInit = {}) {
       ...(options.headers ?? {}),
     },
   });
+
+  // intuit_tid identifies the request in Intuit's own logs. Capturing it on
+  // failures is the first thing their support team asks for.
+  if (!res.ok) {
+    console.error(
+      "[quickbooks] %s %s failed: status=%s intuit_tid=%s",
+      options.method ?? "GET",
+      path.split("?")[0],
+      res.status,
+      res.headers.get("intuit_tid") ?? "none"
+    );
+  }
+
+  return res;
+}
+
+/** The Intuit transaction id for a response, for support tickets. */
+export function intuitTid(res: Response): string | null {
+  return res.headers.get("intuit_tid");
 }
 
 export async function qbIsConnected(): Promise<boolean> {

@@ -184,6 +184,14 @@ export default function QuickBooksPage() {
               more than one company under the same Intuit login, so check the name above
               after connecting.
             </p>
+
+            <p className="text-xs text-slate-500 border-t pt-4">
+              Something wrong with the connection or an invoice? Email{" "}
+              <a href="mailto:info@northlygroup.com" className="text-[#E8192C] underline">
+                info@northlygroup.com
+              </a>{" "}
+              and include the company name and invoice number shown above.
+            </p>
           </div>
         )}
       </div>
