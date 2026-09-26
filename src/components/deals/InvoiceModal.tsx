@@ -5,25 +5,20 @@ import { X, Receipt, ExternalLink, AlertCircle, Link2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/pricing";
 import { loadBillingCache, saveBillingCache } from "@/lib/billing-cache";
+import {
+  centsToDollars,
+  computeInvoiceTotals,
+  dollarsToCents,
+  parseProvince,
+  PROVINCES,
+  type PaymentMethod,
+} from "@/lib/invoice-pricing";
 
-const PROVINCE_TAX: Record<string, { name: string; rate: number }> = {
-  ON: { name: "HST (ON)", rate: 0.13 },
-  BC: { name: "GST + PST (BC)", rate: 0.12 },
-  AB: { name: "GST (AB)", rate: 0.05 },
-  QC: { name: "GST + QST (QC)", rate: 0.14975 },
-  MB: { name: "GST + PST (MB)", rate: 0.12 },
-  SK: { name: "GST + PST (SK)", rate: 0.11 },
-  NS: { name: "HST (NS)", rate: 0.15 },
-  NB: { name: "HST (NB)", rate: 0.15 },
-  PE: { name: "HST (PE)", rate: 0.15 },
-  NL: { name: "HST (NL)", rate: 0.15 },
-  NT: { name: "GST (NT)", rate: 0.05 },
-  NU: { name: "GST (NU)", rate: 0.05 },
-  YT: { name: "GST (YT)", rate: 0.05 },
-};
-
-const PROVINCES = [
-  "AB","BC","MB","NB","NL","NS","NT","NU","ON","PE","QC","SK","YT",
+const PAYMENT_METHODS: { value: PaymentMethod; label: string }[] = [
+  { value: "e_transfer", label: "E-transfer" },
+  { value: "credit_card", label: "Credit card (adds 3% fee)" },
+  { value: "cheque", label: "Cheque" },
+  { value: "eft", label: "EFT" },
 ];
 
 const OPTION_LABELS: Record<number, string> = {
@@ -66,6 +61,7 @@ export default function InvoiceModal({
       clientProvince: cache.province || "ON",
       clientPostal: cache.postal,
       optionNumber: defaultOption,
+      paymentMethod: "e_transfer" as PaymentMethod,
       serviceDescription: "",
       invoiceDate: today,
       dueDate: today,
@@ -106,9 +102,38 @@ export default function InvoiceModal({
   }
 
   const subtotal = optionPrices[`option${form.optionNumber}Price`] ?? 0;
-  const tax = PROVINCE_TAX[form.clientProvince] ?? PROVINCE_TAX.ON;
-  const taxAmount = Math.round(subtotal * tax.rate * 100) / 100;
-  const total = subtotal + taxAmount;
+
+  // Previewed from the same engine the invoice is built with, so what the AE
+  // sees here and what QuickBooks bills can never drift apart.
+  const preview = (() => {
+    try {
+      const totals = computeInvoiceTotals({
+        province: parseProvince(form.clientProvince),
+        paymentMethod: form.paymentMethod,
+        discountCents: 0,
+        lines: [
+          { quantity: 1, unitPriceCents: dollarsToCents(subtotal), taxTreatment: "standard" },
+        ],
+      });
+      return {
+        taxLabel: totals.taxLabel,
+        taxAmount: centsToDollars(totals.taxCents),
+        processingFee: centsToDollars(totals.feeCents),
+        total: centsToDollars(totals.totalCents),
+        error: "",
+      };
+    } catch (err) {
+      return {
+        taxLabel: "Tax",
+        taxAmount: 0,
+        processingFee: 0,
+        total: subtotal,
+        error: err instanceof Error ? err.message : "Cannot price this province.",
+      };
+    }
+  })();
+
+  const { taxAmount, processingFee, total } = preview;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -129,6 +154,7 @@ export default function InvoiceModal({
           clientPostal: form.clientPostal,
           optionNumber: form.optionNumber,
           subtotal,
+          paymentMethod: form.paymentMethod,
           serviceDescription: form.serviceDescription,
           invoiceDate: form.invoiceDate,
           dueDate: form.dueDate,
@@ -328,21 +354,47 @@ export default function InvoiceModal({
                 </div>
               </div>
 
-              {/* Tax preview */}
+              {/* Payment method — decides whether the 3% processing fee applies */}
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Payment Method</label>
+                <select
+                  value={form.paymentMethod}
+                  onChange={(e) => set("paymentMethod", e.target.value)}
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#E8192C]/30"
+                >
+                  {PAYMENT_METHODS.map((m) => (
+                    <option key={m.value} value={m.value}>{m.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Totals preview */}
               <div className="bg-slate-50 rounded-xl p-4 text-sm space-y-1.5">
                 <div className="flex justify-between text-slate-600">
                   <span>Subtotal</span>
                   <span>{formatCurrency(subtotal)}</span>
                 </div>
                 <div className="flex justify-between text-slate-600">
-                  <span>{tax.name} ({(tax.rate * 100).toFixed(3).replace(/\.?0+$/, "")}%)</span>
+                  <span>{preview.taxLabel}</span>
                   <span>{formatCurrency(taxAmount)}</span>
                 </div>
+                {processingFee > 0 && (
+                  <div className="flex justify-between text-slate-600">
+                    <span>Processing fee 3% (zero-rated)</span>
+                    <span>{formatCurrency(processingFee)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between font-semibold text-slate-900 border-t pt-1.5">
                   <span>Total</span>
                   <span>{formatCurrency(total)}</span>
                 </div>
               </div>
+
+              {preview.error && (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800">
+                  {preview.error}
+                </div>
+              )}
 
               {error && (
                 <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700 space-y-2">

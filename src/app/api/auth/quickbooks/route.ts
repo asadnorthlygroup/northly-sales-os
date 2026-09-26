@@ -16,6 +16,12 @@ export async function GET(request: NextRequest) {
     state,
   });
   const res = NextResponse.redirect(`${QB_AUTH_URL}?${params.toString()}`);
+  // Remembered so the callback can prove the response belongs to this request.
+  // Without it an attacker could feed us their own authorization code and bind
+  // our app to a QuickBooks company we did not choose.
+  res.cookies.set("qb_oauth_state", state, {
+    httpOnly: true, sameSite: "lax", path: "/", maxAge: 600, secure: true,
+  });
   // Stash where to return after the OAuth round-trip. Only accept relative paths.
   if (returnTo && returnTo.startsWith("/")) {
     res.cookies.set("qb_return_to", returnTo, {

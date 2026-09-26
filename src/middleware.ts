@@ -27,8 +27,19 @@ export async function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
-  // Public routes — no auth needed
-  const publicPaths = ["/login", "/auth/callback", "/api/auth/quickbooks/callback"];
+  // Public routes — no auth needed.
+  // /privacy, /terms and /quickbooks must stay reachable without signing in.
+  // Intuit checks the privacy, terms, connect and disconnect URLs when issuing
+  // production keys, and a login redirect fails that check. The /quickbooks
+  // page shows nothing until its status call succeeds, which needs a session.
+  const publicPaths = [
+    "/login",
+    "/auth/callback",
+    "/api/auth/quickbooks/callback",
+    "/privacy",
+    "/terms",
+    "/quickbooks",
+  ];
   if (publicPaths.some((p) => pathname.startsWith(p))) {
     return supabaseResponse;
   }

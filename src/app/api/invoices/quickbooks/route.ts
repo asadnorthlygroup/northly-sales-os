@@ -3,6 +3,17 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { qbFetch } from "@/lib/quickbooks";
+import {
+  centsToDollars,
+  computeInvoiceTotals,
+  dollarsToCents,
+  formatCents,
+  parseProvince,
+  reconcile,
+  type InvoiceLineInput,
+  type InvoiceTotals,
+  type PaymentMethod,
+} from "@/lib/invoice-pricing";
 
 function adminClient() {
   return createClient(
@@ -12,11 +23,32 @@ function adminClient() {
   );
 }
 
+interface InvoiceRequestBody {
+  dealId?: string;
+  clientName: string;
+  clientEmail: string;
+  clientStreet: string;
+  clientCity: string;
+  clientProvince: string;
+  clientPostal: string;
+  optionNumber: number;
+  /** Legacy single-line callers send a dollar subtotal. */
+  subtotal?: number;
+  /** Preferred: explicit lines in dollars. Takes precedence over subtotal. */
+  lines?: { description?: string; quantity: number; unitPrice: number; zeroRated?: boolean }[];
+  paymentMethod?: PaymentMethod;
+  discount?: number;
+  serviceDescription: string;
+  invoiceDate: string;
+  dueDate: string;
+  selectedAccountHandles: string[];
+}
+
 async function saveInvoiceLocally(
   inv: { Id: string; DocNumber: string },
-  body: { dealId?: string; clientName: string; clientProvince: string; optionNumber: number; subtotal: number; serviceDescription: string; invoiceDate: string; dueDate: string; selectedAccountHandles: string[] },
-  taxAmount: number,
-  total: number,
+  body: InvoiceRequestBody,
+  totals: InvoiceTotals,
+  paymentMethod: PaymentMethod,
   qbUrl: string,
   userId: string
 ) {
@@ -25,9 +57,12 @@ async function saveInvoiceLocally(
     deal_id: body.dealId ?? null,
     client_name: body.clientName,
     option_number: body.optionNumber,
-    subtotal: body.subtotal,
-    tax_amount: taxAmount,
-    total,
+    subtotal: centsToDollars(totals.subtotalCents),
+    discount_amount: centsToDollars(totals.discountCents),
+    tax_amount: centsToDollars(totals.taxCents),
+    processing_fee: centsToDollars(totals.feeCents),
+    total: centsToDollars(totals.totalCents),
+    payment_method: paymentMethod,
     province: body.clientProvince,
     invoice_date: body.invoiceDate,
     due_date: body.dueDate,
@@ -40,22 +75,6 @@ async function saveInvoiceLocally(
     created_by: userId,
   });
 }
-
-const PROVINCE_TAX: Record<string, { name: string; rate: number }> = {
-  ON: { name: "HST", rate: 0.13 },
-  BC: { name: "GST/PST", rate: 0.12 },
-  AB: { name: "GST", rate: 0.05 },
-  QC: { name: "GST/QST", rate: 0.14975 },
-  MB: { name: "GST/PST", rate: 0.12 },
-  SK: { name: "GST/PST", rate: 0.11 },
-  NS: { name: "HST", rate: 0.15 },
-  NB: { name: "HST", rate: 0.15 },
-  PE: { name: "HST", rate: 0.15 },
-  NL: { name: "HST", rate: 0.15 },
-  NT: { name: "GST", rate: 0.05 },
-  NU: { name: "GST", rate: 0.05 },
-  YT: { name: "GST", rate: 0.05 },
-};
 
 async function findOrCreateCustomer(
   displayName: string,
@@ -112,6 +131,42 @@ async function findOrCreateCustomer(
   return created.Customer.Id;
 }
 
+/** Turns the request body into engine input, accepting legacy and multi-line callers. */
+function toPricingLines(body: InvoiceRequestBody): {
+  lines: InvoiceLineInput[];
+  descriptions: string[];
+} {
+  if (body.lines && body.lines.length > 0) {
+    return {
+      lines: body.lines.map((line) => ({
+        quantity: line.quantity,
+        unitPriceCents: dollarsToCents(line.unitPrice),
+        taxTreatment: line.zeroRated ? "zero_rated" : "standard",
+      })),
+      descriptions: body.lines.map((line) => line.description ?? ""),
+    };
+  }
+
+  const pagesStr =
+    body.selectedAccountHandles?.length > 0
+      ? `\nPages: ${body.selectedAccountHandles.join(", ")}`
+      : "";
+
+  return {
+    lines: [
+      {
+        quantity: 1,
+        unitPriceCents: dollarsToCents(body.subtotal ?? 0),
+        taxTreatment: "standard",
+      },
+    ],
+    descriptions: [
+      body.serviceDescription ||
+        `Northly Group Marketing Package — Option ${body.optionNumber}${pagesStr}`,
+    ],
+  };
+}
+
 export async function POST(request: NextRequest) {
   const cookieStore = await cookies();
   const supabase = createServerClient(
@@ -131,157 +186,194 @@ export async function POST(request: NextRequest) {
   if (!session) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
   try {
-  const body = await request.json() as {
-    dealId: string;
-    clientName: string;
-    clientEmail: string;
-    clientStreet: string;
-    clientCity: string;
-    clientProvince: string;
-    clientPostal: string;
-    optionNumber: number;
-    subtotal: number;
-    serviceDescription: string;
-    invoiceDate: string;
-    dueDate: string;
-    selectedAccountHandles: string[];
-  };
+    const body = (await request.json()) as InvoiceRequestBody;
 
-  const {
-    clientName,
-    clientEmail,
-    clientStreet,
-    clientCity,
-    clientProvince,
-    clientPostal,
-    optionNumber,
-    subtotal,
-    serviceDescription,
-    invoiceDate,
-    dueDate,
-    selectedAccountHandles,
-  } = body;
+    const {
+      clientName,
+      clientEmail,
+      clientStreet,
+      clientCity,
+      clientProvince,
+      clientPostal,
+      invoiceDate,
+      dueDate,
+    } = body;
 
-  const tax = PROVINCE_TAX[clientProvince?.toUpperCase()] ?? PROVINCE_TAX.ON;
-  const taxAmount = Math.round(subtotal * tax.rate * 100) / 100;
-  const total = subtotal + taxAmount;
+    // Throws on an unrecognised code rather than silently taxing at Ontario's rate.
+    const province = parseProvince(clientProvince);
+    const paymentMethod: PaymentMethod = body.paymentMethod ?? "e_transfer";
 
-  // Find or create customer
-  const customerId = await findOrCreateCustomer(
-    clientName,
-    clientEmail,
-    clientStreet,
-    clientCity,
-    clientProvince,
-    clientPostal
-  );
+    const { lines, descriptions } = toPricingLines(body);
 
-  const pagesStr = selectedAccountHandles.length > 0
-    ? `\nPages: ${selectedAccountHandles.join(", ")}`
-    : "";
+    const totals = computeInvoiceTotals({
+      province,
+      paymentMethod,
+      discountCents: dollarsToCents(body.discount ?? 0),
+      lines,
+    });
 
-  const lineDescription = serviceDescription ||
-    `Northly Group Marketing Package — Option ${optionNumber}${pagesStr}`;
+    const customerId = await findOrCreateCustomer(
+      clientName,
+      clientEmail,
+      clientStreet,
+      clientCity,
+      clientProvince,
+      clientPostal
+    );
 
-  // Build invoice payload
-  const invoicePayload = {
-    CustomerRef: { value: customerId },
-    TxnDate: invoiceDate,
-    DueDate: dueDate,
-    Line: [
-      {
-        Amount: subtotal,
+    const taxPercent = totals.taxableBaseCents > 0
+      ? (totals.taxCents / totals.taxableBaseCents) * 100
+      : 0;
+
+    const serviceLines = lines.map((line, index) => ({
+      Amount: centsToDollars(line.quantity * line.unitPriceCents),
+      DetailType: "SalesItemLineDetail",
+      Description: descriptions[index] ?? "",
+      SalesItemLineDetail: {
+        ItemRef: { value: "1", name: "Services" },
+        UnitPrice: centsToDollars(line.unitPriceCents),
+        Qty: line.quantity,
+        TaxCodeRef: { value: line.taxTreatment === "zero_rated" ? "NON" : "TAX" },
+      },
+    }));
+
+    // The line whose absence cost $305.10 on invoice 1822. Zero-rated, so the
+    // fee is never itself taxed.
+    if (totals.feeCents > 0) {
+      serviceLines.push({
+        Amount: centsToDollars(totals.feeCents),
         DetailType: "SalesItemLineDetail",
-        Description: lineDescription,
+        Description: "Credit card payment processing fee 3%",
         SalesItemLineDetail: {
           ItemRef: { value: "1", name: "Services" },
-          UnitPrice: subtotal,
+          UnitPrice: centsToDollars(totals.feeCents),
           Qty: 1,
-          TaxCodeRef: { value: "TAX" },
+          TaxCodeRef: { value: "NON" },
         },
-      },
-    ],
-    TxnTaxDetail: {
-      TotalTax: taxAmount,
-      TaxLine: [
-        {
-          Amount: taxAmount,
-          DetailType: "TaxLineDetail",
-          TaxLineDetail: {
-            TaxRateRef: { value: "1" },
-            PercentBased: true,
-            TaxPercent: tax.rate * 100,
-            NetAmountTaxable: subtotal,
-          },
-        },
-      ],
-    },
-    CustomerMemo: { value: "Please remit payment via E-transfer to payments@waveroomtv.com" },
-    BillEmail: clientEmail ? { Address: clientEmail } : undefined,
-  };
+      });
+    }
 
-  const invoiceRes = await qbFetch("/invoice?minorversion=70", {
-    method: "POST",
-    body: JSON.stringify(invoicePayload),
-  });
+    const memo =
+      paymentMethod === "credit_card"
+        ? "Payable by credit card using the payment link on this invoice. A 3% processing fee is included."
+        : "Please remit payment via E-transfer to payments@waveroomtv.com";
 
-  if (!invoiceRes.ok) {
-    const err = await invoiceRes.text();
-    console.error("QB invoice create error:", err);
-
-    // If tax code fails, retry without tax codes (simpler approach)
-    const simplePayload = {
+    const invoicePayload = {
       CustomerRef: { value: customerId },
       TxnDate: invoiceDate,
       DueDate: dueDate,
-      Line: [
-        {
-          Amount: subtotal,
-          DetailType: "SalesItemLineDetail",
-          Description: lineDescription,
-          SalesItemLineDetail: {
-            ItemRef: { value: "1", name: "Services" },
-            UnitPrice: subtotal,
-            Qty: 1,
+      Line: serviceLines,
+      TxnTaxDetail: {
+        TotalTax: centsToDollars(totals.taxCents),
+        TaxLine: [
+          {
+            Amount: centsToDollars(totals.taxCents),
+            DetailType: "TaxLineDetail",
+            TaxLineDetail: {
+              TaxRateRef: { value: "1" },
+              PercentBased: true,
+              TaxPercent: taxPercent,
+              NetAmountTaxable: centsToDollars(totals.taxableBaseCents),
+            },
           },
-        },
-        {
-          Amount: taxAmount,
-          DetailType: "SalesItemLineDetail",
-          Description: `${tax.name} @ ${(tax.rate * 100).toFixed(2).replace(/\.?0+$/, "")}%`,
-          SalesItemLineDetail: {
-            ItemRef: { value: "1", name: "Services" },
-            UnitPrice: taxAmount,
-            Qty: 1,
-          },
-        },
-      ],
-      CustomerMemo: { value: "Please remit payment via E-transfer to payments@waveroomtv.com" },
+        ],
+      },
+      CustomerMemo: { value: memo },
+      BillEmail: clientEmail ? { Address: clientEmail } : undefined,
     };
 
-    const retryRes = await qbFetch("/invoice?minorversion=70", {
+    let inv: { Id: string; DocNumber: string; TotalAmt?: number };
+
+    const invoiceRes = await qbFetch("/invoice?minorversion=70", {
       method: "POST",
-      body: JSON.stringify(simplePayload),
+      body: JSON.stringify(invoicePayload),
     });
 
-    if (!retryRes.ok) {
-      const retryErr = await retryRes.text();
-      return NextResponse.json({ error: "Failed to create QB invoice", detail: retryErr }, { status: 500 });
+    if (invoiceRes.ok) {
+      inv = (await invoiceRes.json()).Invoice;
+    } else {
+      const err = await invoiceRes.text();
+      console.error("QB invoice create error:", err);
+
+      // Fall back to expressing tax as its own line when the tax codes are
+      // rejected. The fee line is carried through so it is never lost.
+      const simplePayload = {
+        CustomerRef: { value: customerId },
+        TxnDate: invoiceDate,
+        DueDate: dueDate,
+        Line: [
+          ...serviceLines.map((line) => ({
+            ...line,
+            SalesItemLineDetail: {
+              ItemRef: line.SalesItemLineDetail.ItemRef,
+              UnitPrice: line.SalesItemLineDetail.UnitPrice,
+              Qty: line.SalesItemLineDetail.Qty,
+            },
+          })),
+          {
+            Amount: centsToDollars(totals.taxCents),
+            DetailType: "SalesItemLineDetail",
+            Description: totals.taxLabel,
+            SalesItemLineDetail: {
+              ItemRef: { value: "1", name: "Services" },
+              UnitPrice: centsToDollars(totals.taxCents),
+              Qty: 1,
+            },
+          },
+        ],
+        CustomerMemo: { value: memo },
+      };
+
+      const retryRes = await qbFetch("/invoice?minorversion=70", {
+        method: "POST",
+        body: JSON.stringify(simplePayload),
+      });
+
+      if (!retryRes.ok) {
+        const retryErr = await retryRes.text();
+        return NextResponse.json(
+          { error: "Failed to create QB invoice", detail: retryErr },
+          { status: 500 }
+        );
+      }
+
+      inv = (await retryRes.json()).Invoice;
     }
 
-    const retryData = await retryRes.json();
-    const inv = retryData.Invoice;
     const qbUrl = `https://app.qbo.intuit.com/app/invoice?txnId=${inv.Id}`;
-    await saveInvoiceLocally(inv, body, taxAmount, total, qbUrl, session.user.id);
-    return NextResponse.json({ invoiceId: inv.Id, invoiceNumber: inv.DocNumber, total, qbUrl });
-  }
+    await saveInvoiceLocally(inv, body, totals, paymentMethod, qbUrl, session.user.id);
 
-  const data = await invoiceRes.json();
-  const inv = data.Invoice;
-  const qbUrl = `https://app.qbo.intuit.com/app/invoice?txnId=${inv.Id}`;
-  await saveInvoiceLocally(inv, body, taxAmount, total, qbUrl, session.user.id);
+    // The gate. If QuickBooks and our engine disagree, the invoice exists but
+    // must not be treated as ready to send.
+    if (typeof inv.TotalAmt === "number") {
+      const check = reconcile(totals.totalCents, dollarsToCents(inv.TotalAmt));
+      if (!check.ok) {
+        return NextResponse.json(
+          {
+            error:
+              `Invoice ${inv.DocNumber} was created but its total does not match the agreement. ` +
+              `Expected ${formatCents(check.expectedCents)}, QuickBooks recorded ` +
+              `${formatCents(check.actualCents)}, a difference of ${formatCents(check.differenceCents)}. ` +
+              `Review it in QuickBooks before sending anything to the client.`,
+            code: "reconciliation_failed",
+            invoiceId: inv.Id,
+            invoiceNumber: inv.DocNumber,
+            qbUrl,
+          },
+          { status: 409 }
+        );
+      }
+    }
 
-  return NextResponse.json({ invoiceId: inv.Id, invoiceNumber: inv.DocNumber, total, qbUrl });
+    return NextResponse.json({
+      invoiceId: inv.Id,
+      invoiceNumber: inv.DocNumber,
+      subtotal: centsToDollars(totals.subtotalCents),
+      tax: centsToDollars(totals.taxCents),
+      processingFee: centsToDollars(totals.feeCents),
+      total: centsToDollars(totals.totalCents),
+      qbUrl,
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error creating QuickBooks invoice";
     const code = (err as Error & { code?: string })?.code;
